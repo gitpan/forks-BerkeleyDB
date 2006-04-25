@@ -1,0 +1,37 @@
+This file contains message digests of all files listed in MANIFEST,
+signed via the Module::Signature module, version 0.53.
+
+To verify the content in this distribution, first make sure you have
+Module::Signature installed, then type:
+
+    % cpansign -v
+
+It will check each file's integrity, as well as the signature's
+validity.  If "==> Signature verified OK! <==" is not displayed,
+the distribution may already have been compromised, and you should
+not run its Makefile.PL or Build.PL.
+
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+SHA1 84d9431efbcc6c72d55b0670a54e6131e29d053e Changes
+SHA1 b43e7e43286a23418fabcaac206c9963feb103cc MANIFEST
+SHA1 ad935882c5bf45e3755dfb539be430324f9df6d3 META.yml
+SHA1 5c2a861d0f73583e1382180e41397d679aad643b Makefile.PL
+SHA1 db96ca8a9cc407d8db3097e7ecfbda5e249b71c8 README
+SHA1 dc2e2777f6d206c4ddc6a6c12e38f4f2c4452858 lib/forks/BerkeleyDB.pm
+SHA1 0d9977e08f5aea210982ec00760de682f47edafb lib/forks/BerkeleyDB/shared.pm
+SHA1 83488819e52e232589ebdff49cbe7b3a35525216 lib/forks/BerkeleyDB/shared/array.pm
+SHA1 fcba852f9307eb19c44792d6ebdd822c4f458fdd lib/forks/BerkeleyDB/shared/handle.pm
+SHA1 24a8efc9ad2dec56ee2e5539b072cc681ae2fb3b lib/forks/BerkeleyDB/shared/hash.pm
+SHA1 cda46c2134b5c09cdb63214d81c3b68ff8bf2e2b lib/forks/BerkeleyDB/shared/scalar.pm
+SHA1 cf2fcd4580ccdb1cb741758cdafa1025c9d972b2 t/forks01.t
+SHA1 2d787677524cb3074560d5844e3df70f8fd3a36b t/forks02.t
+SHA1 e808eb1b21301984f4aac605bf5a63112ca479e3 t/forks03.t
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.2.1 (Cygwin)
+
+iD8DBQFETcH5Qwn7DcpJEO4RAhIIAJ9FZzg3t1rcBMviIafH9vcodks0rwCfV/A1
++o87OqUiW/Gc3ph7gsl0Qt4=
+=+gqh
+-----END PGP SIGNATURE-----
