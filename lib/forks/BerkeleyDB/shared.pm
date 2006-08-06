@@ -1,19 +1,23 @@
 package forks::BerkeleyDB::shared;
 
-$VERSION = 0.01;
+$VERSION = 0.02;
 use strict;
 use warnings;
+use forks::BerkeleyDB::Config;
 use BerkeleyDB 0.27;
 use Storable qw(freeze thaw);
 use Tie::Restore 0.11;
+use Scalar::Util qw(blessed reftype);
 #use Scalar::Util qw(weaken);
 
-use constant DEBUG => 0;
+use constant DEBUG => forks::BerkeleyDB::Config::DEBUG();
+use constant ENV_ROOT => forks::BerkeleyDB::Config::ENV_ROOT();
+use constant ENV_PATH => forks::BerkeleyDB::Config::ENV_PATH();
 #use Data::Dumper;
 
 our %object_refs;	#refs of all shared objects (for CLONE use, and strong refs: allow shared vars to hold other shared vars as values; END{...} cleanup in all threads)
 our @shared_cache;	#tied BDB array that stores shared variable objects for other threads to use to reconstitute if they were created outside their scope
-our $bdb_env;	#berkeleydb environment
+our @shared_cache_attr_bless;	#tied BDB array that stores shared variable object attribute bless
 
 use constant TERMINATOR => "\0";
 use constant ELEM_NOT_EXISTS => "!";	#indicates element does not exist (used for arrays)
@@ -23,7 +27,7 @@ sub _filter_fetch_value {
 #warn "output: '$_', defined=",defined $_,",length=",length $_ if DEBUG;
 	if (!defined $_ || length $_ == 0) { $_ = undef; }
 	elsif (length $_ == 1 && $_ eq ELEM_NOT_EXISTS) {
-		$_ = forks::BerkeleyDB::shared::Elem::NotExists->new();
+		$_ = forks::BerkeleyDB::ElemNotExists->new();
 	}
 	else {
 		if (substr($_, -1) eq TERMINATOR) {	#regular data value
@@ -43,11 +47,16 @@ sub _filter_fetch_value {
 					&{$sub}($obj);
 				}
 			}
-			my $scalar; my @array; my %hash; #my *handle;
-			if ($object_refs{$_}->{'type'} eq 'scalar') { tie $scalar, 'Tie::Restore', $object_refs{$_}; $_ = \$scalar; }
-			elsif ($object_refs{$_}->{'type'} eq 'array') { tie @array, 'Tie::Restore', $object_refs{$_}; $_ = \@array; }
-			elsif ($object_refs{$_}->{'type'} eq 'hash') { tie %hash, 'Tie::Restore', $object_refs{$_}; $_ = \%hash; }
-#			elsif ($object_refs{$_}->{'type'} eq 'scalar') { tie *handle, 'Tie::Restore', $object_refs{$_}; $_ = \*handle; }
+			my $class = $shared_cache_attr_bless[$_];
+
+			if ($object_refs{$_}->{'type'} eq 'scalar')
+				{ my $s; tie $s, 'Tie::Restore', $object_refs{$_}; $_ = $class ? CORE::bless(\$s, $class) : \$s; }
+			elsif ($object_refs{$_}->{'type'} eq 'array')
+				{ my @a; tie @a, 'Tie::Restore', $object_refs{$_}; $_ = $class ? CORE::bless(\@a, $class) : \@a; }
+			elsif ($object_refs{$_}->{'type'} eq 'hash')
+				{ my %h; tie %h, 'Tie::Restore', $object_refs{$_}; $_ = $class ? CORE::bless(\%h, $class) : \%h; }
+#			elsif ($object_refs{$_}->{'type'} eq 'scalar')
+#				{ my *h; tie *h, 'Tie::Restore', $object_refs{$_}; $_ = $class ? CORE::bless(\*h, $class) : \*h; }
 			else {
 				_croak( "Unable to restore shared variable \#$_: ".ref($object_refs{$_}) );
 			}
@@ -59,19 +68,18 @@ sub _filter_store_value {
 #warn "input: '$_', defined=",defined $_,",length=",length $_ if DEBUG;
 	if (defined $_) {
 		if (ref($_)) {	#does this support both share(@a) and share(\@_)?
-			if (UNIVERSAL::isa($_, 'forks::BerkeleyDB::shared::Elem::NotExists')) { $_ = ELEM_NOT_EXISTS; }
+			if (UNIVERSAL::isa($_, 'forks::BerkeleyDB::ElemNotExists')) { $_ = ELEM_NOT_EXISTS; }
 			else {
-				my $tied = ref($_) eq 'SCALAR' ? tied ${$_} 
-					: ref($_) eq 'ARRAY' ? tied @{$_} 
-					: ref($_) eq 'HASH' ? tied %{$_} 
-					: ref($_) eq 'GLOB' ? tied *{$_} : undef;
-#warn "input: ".Dumper(ref $_, $tied, $_) if DEBUG;
+				my $tied = reftype($_) eq 'SCALAR' ? tied ${$_} 
+					: reftype($_) eq 'ARRAY' ? tied @{$_} 
+					: reftype($_) eq 'HASH' ? tied %{$_} 
+					: reftype($_) eq 'GLOB' ? tied *{$_} : undef;
+#warn "input: ".Dumper(ref $_, reftype $_, blessed $_, $tied, $_) if DEBUG;
 				if (UNIVERSAL::isa($tied, 'threads::shared')) {	#store shared ref ordinal
 					$_ = $tied->{'ordinal'};
 				}
 				else {	#future: transparently bless any type of object across all threads?
-					_croak( "Invalid value for shared scalar: ".Dumper($_) );
-#					_croak( "Invalid value for shared scalar" );
+					_croak( "Invalid value for shared scalar: ".(reftype($_) || $_) );
 				}
 			}
 		}
@@ -84,63 +92,54 @@ sub _filter_store_value {
 
 ########################################################################
 BEGIN {
-	use forks::shared (); die "forks version 0.18 required--this is only version $threads::VERSION" unless $threads::VERSION >= 0.18;
-	use File::Spec;
-	use constant ENV_ROOT => File::Spec->tmpdir().'/perlforks';
-	use constant ENV_PATH => ENV_ROOT.'/env.'.$$;	#would prefer $threads::SHARED, although current pid should be safe as long as it's main thread
+	use forks::shared (); die "forks version 0.18 required--this is only version $threads::VERSION" unless defined $forks::VERSION && $forks::VERSION >= 0.18;
+	use forks::BerkeleyDB::shared::array;
 	
 	*_croak = *_croak = \&threads::_croak;
 	
 	_croak( "Must first 'use forks::BerkeleyDB'\n" ) unless $INC{'forks/BerkeleyDB.pm'};
 
-	sub _open_env () {
-		### open the base environment ###
-		return new BerkeleyDB::Env(
-			-Home  => ENV_PATH,
-			-Flags => DB_INIT_CDB | DB_CREATE | DB_INIT_MPOOL,
-		) or _croak( "Can't create BerkeleyDB::Env (home=".ENV_PATH."): $BerkeleyDB::Error" );
-	}
-	
-	sub _purge_env () {
-		opendir(ENVDIR, ENV_PATH);
-		my @files_to_del = grep(!/^(\.|\.\.)$/, readdir(ENVDIR));
-		closedir(ENVDIR);
-		warn "unlinking: ".join(', ', map(ENV_PATH."/$_", @files_to_del)) if DEBUG;
-		foreach (@files_to_del) {
-			my $file = ENV_PATH."/$_";
-			$file =~ m/^([\/-\@\w_.]+)$/so;	#untaint
-			_croak( "Unable to unlink file '$1'. Please manually remove this file." ) unless unlink $1;
-		}
-	}
-	
 	#need to store separate, serialized, db-disconnected copy in a separate database, so other threads can re-create arrayrefs and hashrefs
 	sub _tie_shared_cache () {
-		use forks::BerkeleyDB::shared::array;
-		untie @shared_cache;
 		tie @shared_cache, 'forks::BerkeleyDB::shared::array', (
 			-Filename => ENV_PATH."/shared.bdb",
 			-Flags    => DB_CREATE,
 			-Mode     => 0666,
-			-Env      => $bdb_env,
+			-Env      => $forks::BerkeleyDB::bdb_env,
+		);
+
+		tie @shared_cache_attr_bless, 'forks::BerkeleyDB::shared::array', (
+			-Filename => ENV_PATH."/shared_attr_bless.bdb",
+			-Flags    => DB_CREATE,
+			-Mode     => 0666,
+			-Env      => $forks::BerkeleyDB::bdb_env,
 		);
 	}
 	
-	*CORE::GLOBAL::fork = sub {
-		### safely sync & close databases, close environment ###
-		foreach my $key (keys %forks::BerkeleyDB::shared::object_refs) {
-#			eval { $forks::BerkeleyDB::shared::object_refs{$key}->{bdb}->db_sync(); };
-			eval { $forks::BerkeleyDB::shared::object_refs{$key}->{bdb}->db_close(); };
-			$object_refs{$key}->{bdb_reconnect} = 1;	#hint that this object must be recreated from cache
+	sub _untie_shared_cache () {
+		untie @shared_cache;
+		untie @shared_cache_attr_bless;
+	}
+	
+	*_ORIG_fork = *_ORIG_fork = \&CORE::GLOBAL::fork;
+
+	sub _fork {
+		### safely sync & close databases ###
+		{
+			local $@;
+			foreach my $key (keys %forks::BerkeleyDB::shared::object_refs) {
+#				eval { $forks::BerkeleyDB::shared::object_refs{$key}->{bdb}->db_sync(); };
+				eval { $forks::BerkeleyDB::shared::object_refs{$key}->{bdb}->db_close(); };
+				$object_refs{$key}->{bdb_reconnect} = 1;	#hint that this object must be recreated from cache
+			}
 		}
-		untie @forks::BerkeleyDB::shared::shared_cache;
-		$forks::BerkeleyDB::shared::bdb_env = undef;
+		forks::BerkeleyDB::shared::_untie_shared_cache();
 		
 		### do the fork ###
-		my $pid = CORE::fork;
+		my $pid = _ORIG_fork();
 
 		if (!defined $pid || $pid) { #in parent
-			### re-open environment and immediately retie to critical databases ###
-			$forks::BerkeleyDB::shared::bdb_env = forks::BerkeleyDB::shared::_open_env();
+			### immediately retie to critical databases ###
 			forks::BerkeleyDB::shared::_tie_shared_cache();
 #			foreach my $key (keys %forks::BerkeleyDB::shared::object_refs) {
 #				my $sub = 'forks::BerkeleyDB::shared::_tie'.$forks::BerkeleyDB::shared::object_refs{$key}->{type};
@@ -153,36 +152,30 @@ BEGIN {
 				
 		return $pid;
 	};
-
-	### create/purge necessary paths to create clean environment ###
-	if (-d ENV_PATH) {
-		_purge_env();
-	}
-	else {
-		unless (-d ENV_ROOT) {
-			my $status = mkdir ENV_ROOT, 0777;
-			_croak( "Can't create directory ".ENV_ROOT ) unless $status;
-		}
-		mkdir ENV_PATH, 0777 or _croak( "Can't create directory ".ENV_PATH );
-	}
 	
+	{
+		no warnings 'redefine';
+		*CORE::GLOBAL::fork = \&_fork;
+	}
+
 	### create the base environment ###
-	$bdb_env = _open_env();
 	_tie_shared_cache();
 }
 
 END {
-	foreach my $key (keys %object_refs) {
-#		eval { $object_refs{$key}->{bdb}->db_sync(); };
-		eval { $object_refs{$key}->{bdb}->db_close(); };
+	{
+		local $@;
+		foreach my $key (keys %object_refs) {
+			eval { $object_refs{$key}->{bdb}->db_sync(); };
+			eval { $object_refs{$key}->{bdb}->db_close(); };
+		}
 	}
-	untie @shared_cache;
-	#also remove database if no threads connected to any databases (maybe use recno DB to monitor num of threads connected per shared var)?
+	_untie_shared_cache();
 }
 
 sub CLONE {	#reopen environment and immediately retie to critical databases
-	$bdb_env = _open_env();
 	_tie_shared_cache();
+#	local $@;
 #	foreach my $key (keys %object_refs) {
 ##		eval { $object_refs{$key}->{bdb}->db_sync(); };
 #		eval { $object_refs{$key}->{bdb}->db_close(); };
@@ -212,7 +205,7 @@ sub _tiescalar ($) {
 		-Filename => $bdb_path,
 		-Flags    => DB_CREATE,
 		-Mode     => 0666,
-		-Env      => $bdb_env,
+		-Env      => $forks::BerkeleyDB::bdb_env,
 	) or _croak( "Can't create bdb $bdb_path" );
 	$obj->{bdb}->filter_fetch_value(\&_filter_fetch_value);
 	$obj->{bdb}->filter_store_value(\&_filter_store_value);
@@ -240,7 +233,7 @@ sub _tiearray ($) {
 		-Flags    => DB_CREATE,
 		-Property => DB_RENUMBER,
 		-Mode     => 0666,
-		-Env      => $bdb_env,
+		-Env      => $forks::BerkeleyDB::bdb_env,
 	) or _croak( "Can't create bdb $bdb_path" );
 	$obj->{bdb}->filter_fetch_value(\&_filter_fetch_value);
 	$obj->{bdb}->filter_store_value(\&_filter_store_value);
@@ -267,7 +260,7 @@ sub _tiehash ($) {
 		-Filename => $bdb_path,
 		-Flags    => DB_CREATE,
 		-Mode     => 0666,
-		-Env      => $bdb_env,
+		-Env      => $forks::BerkeleyDB::bdb_env,
 	) or _croak( "Can't create bdb $bdb_path" );
 	$obj->{bdb}->filter_fetch_value(\&_filter_fetch_value);
 	$obj->{bdb}->filter_store_value(\&_filter_store_value);
@@ -300,24 +293,27 @@ sub _tiehandle ($) {
 {
 	no warnings 'redefine';	#allow overloading without warnings
 
-	*threads::_new = \&threads::new;
-	*threads::new = sub {
+	*_ORIG_new = *_ORIG_new = \&threads::new;
+	*threads::new = \&_new;
+	
+	sub _new {
 		my $class = shift;
 
-		### safely sync & close databases, close environment ###
-		foreach my $key (keys %forks::BerkeleyDB::shared::object_refs) {
-#			eval { $object_refs{$key}->{bdb}->db_sync(); };
-			eval { $object_refs{$key}->{bdb}->db_close(); };
-			$object_refs{$key}->{bdb_reconnect} = 1;	#hint that this object must be recreated from cache
+		### safely sync & close databases ###
+		{
+			local $@;
+			foreach my $key (keys %forks::BerkeleyDB::shared::object_refs) {
+#				eval { $object_refs{$key}->{bdb}->db_sync(); };
+				eval { $object_refs{$key}->{bdb}->db_close(); };
+				$object_refs{$key}->{bdb_reconnect} = 1;	#hint that this object must be recreated from cache
+			}
 		}
-		untie @forks::BerkeleyDB::shared::shared_cache;
-		$forks::BerkeleyDB::shared::bdb_env = undef;
+		forks::BerkeleyDB::shared::_untie_shared_cache();
 		
 		### do whatever threads::new usually does ###
-		my @result = $class->_new(@_);
+		my @result = _ORIG_new($class, @_);
 		
-		### re-open environment and immediately retie to critical databases ###
-		$forks::BerkeleyDB::shared::bdb_env = forks::BerkeleyDB::shared::_open_env();
+		### immediately retie to critical databases ###
 		forks::BerkeleyDB::shared::_tie_shared_cache();
 #		foreach my $key (keys %forks::BerkeleyDB::shared::object_refs) {
 #			my $sub = 'forks::BerkeleyDB::shared::_tie'.$object_refs{$key}->{type};
@@ -330,11 +326,47 @@ sub _tiehandle ($) {
 		return wantarray ? @result : $result[0];
 	};
 	
-	*threads::_isthread = \&threads::isthread;
-	*threads::isthread = sub {
+	*_ORIG_isthread = *_ORIG_isthread = \&threads::isthread;
+	*threads::isthread = \&_isthread;
+
+	sub _isthread {
+		forks::BerkeleyDB::shared::_ORIG_isthread(@_);
 		forks::BerkeleyDB::shared::CLONE();	#retie shared vars
-		threads::_isthread(@_);
 	};
+
+	sub threads::shared::_bless {
+		my $it  = shift;
+		my $ref = reftype $it;
+		my $class = shift;
+		my $object;
+		
+		if ($ref eq 'SCALAR') {
+			$object = tied ${$it};
+#			my $ref2 = reftype ${$it} || '';	#not necessary?
+#			if ($ref2 eq 'SCALAR') {
+#				$object = tied ${${$it}};
+#			} elsif ($ref2 eq 'ARRAY') {
+#				$object = tied @{${$it}};
+#			} elsif ($ref2 eq 'HASH') {
+#				$object = tied %{${$it}};
+#			} elsif ($ref2 eq 'GLOB') {
+#				$object = tied *{${$it}};
+#			} else {
+#				$object = tied ${$it};
+#			}
+		} elsif ($ref eq 'ARRAY') {
+			$object = tied @{$it};
+		} elsif ($ref eq 'HASH') {
+			$object = tied %{$it};
+		} elsif ($ref eq 'GLOB') {
+			$object = tied *{$it};
+		}
+
+		if (defined $object && blessed $object && $object->isa('threads::shared')) {
+			my $ordinal = $object->{'ordinal'};
+			$shared_cache_attr_bless[$object->{ordinal}] = $class;
+		}
+	}
 
 	sub threads::shared::TIESCALAR {
 		return forks::BerkeleyDB::shared::_tiescalar(shift->_tie( 'scalar',@_ ));
@@ -402,17 +434,6 @@ sub _tiehandle ($) {
 	}
 }
 
-########################################################################
-package forks::BerkeleyDB::shared::Elem::NotExists;
-use strict;
-use warnings;
-
-sub new {
-	my $type = shift;
-	my $class = ref($type) || $type;
-	return bless({}, $class);
-}
-
 1;
 
 __END__
@@ -446,8 +467,8 @@ forks::BerkeleyDB::shared - high-performance drop-in replacement for threads::sh
 =head1 DESCRIPTION
 
 forks::BerkeleyDB::shared is a drop-in replacement for L<threads::shared>, written as an
-extension of L<forks::shared>.  The goal of this module is to attempt to improve upon the core
-performance of L<forks::shared> at a level comparable to native ithreads (L<threads::shared>).
+extension of L<forks::shared>.  The goal of this module improve upon the core performance
+of L<forks::shared> at a level comparable to native ithreads (L<threads::shared>).
 
 Depending on how you architect your data processing, you should expect to achieve approx 75%
 the performance of native ithreads for all shared variable operations.  Given that this
@@ -469,7 +490,7 @@ performance, use a partition with a physical drive dedicate for tempory space us
 =head1 NOTES
 
 Currently optimizes SCALAR, ARRAY, and HASH shared variables.  HANDLE type is supported 
-using the default method implemented by forks::shared.
+using the default method implemented by L<forks::shared>.
 
 Shared variable access and modification are NOT guaranteed to be handled as atomic events.  
 This deviates from undocumented L<forks> behavior, where all these events are atomic, but
@@ -483,11 +504,15 @@ of L<forks>.
 
 =head1 CAVIATS
 
+Forks 0.19 or later is required to support transparent blessing across threads.  This feature
+will be silently disabled if this requirement is not met.
+
 =head1 TODO
 
-Implement shared variable locks, signals, and waiting with BerkeleyDB.
+Monitor number of connected shared variables per thread and dynamically disconnect uncommonly
+used vars based on last usage and/or frequency of usage (to meet BDB environment lock limits).
 
-Support transparent bless across threads.
+Implement shared variable locks, signals, and waiting with BerkeleyDB.
 
 =head1 AUTHOR
 

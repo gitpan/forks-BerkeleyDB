@@ -21,7 +21,7 @@ then it should be safe to install the forks.pm modules.
 
 EOD
 
-use Test::More tests => 88;
+use Test::More tests => 91;
 use strict;
 use warnings;
 
@@ -52,6 +52,16 @@ can_ok( 'threads::shared',qw(
  TIESCALAR
 ) );
 
+SKIP: {
+  skip "forks.pm older than version 0.19", 2 unless $forks::VERSION >= 0.19;
+  can_ok( 'threads::shared',qw(
+   is_shared
+   bless
+  ) );
+  
+  is( system("echo"),0, 'check that CORE::system still returns correct exit values' );
+}
+
 unless (my $pid = fork) {
   threads->isthread if defined($pid);
   exit;
@@ -77,9 +87,12 @@ is( $t1->join,'2','check return value thread 1' );
 
 #== SCALAR =========================================================
 
-my $scalar;
-share( $scalar );
-$scalar = 10;
+my $scalar : shared = 10;
+SKIP: {
+  skip "forks.pm older than version 0.19", 1 unless $forks::VERSION >= 0.19;
+  share( $scalar );	#tests that we quietly support re-sharing a shared variable
+  ok(is_shared( $scalar ), 'check if variable is_shared' );
+}
 my $tied = tied( $scalar );
 isa_ok( $tied,'threads::shared',    'check tied object type' );
 
@@ -94,9 +107,7 @@ is( $scalar,'from thread',      'check scalar fetch' );
 
 #== ARRAY ==========================================================
 
-my @array;
-share( @array );
-@array = qw(a b c);
+my @array : shared = qw(a b c);
 $tied = tied( @array );
 isa_ok( $tied,'threads::shared',    'check tied object type' );
 is( join('',@array),'abc',      'check array fetch' );
@@ -157,9 +168,7 @@ is( join('',@array),'',         'check array fetch' );
 
 #== HASH ===========================================================
 
-my %hash;
-share( %hash );
-%hash = (a => 'A');
+my %hash : shared = (a => 'A');
 $tied = tied( %hash );
 isa_ok( $tied,'threads::shared',    'check tied object type' );
 is( $hash{'a'},'A',         'check hash fetch' );

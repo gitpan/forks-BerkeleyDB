@@ -1,9 +1,10 @@
 package forks::BerkeleyDB::shared::array;
 
-$VERSION = 0.01;
+$VERSION = 0.02;
 use strict;
 use warnings;
 use BerkeleyDB 0.27;
+use forks::BerkeleyDB::ElemNotExists;
 use vars qw(@ISA);
 @ISA = qw(BerkeleyDB::Recno);
 
@@ -33,7 +34,7 @@ sub new {
 
 sub _exists_elem ($) {
 	my $value = shift;
-	return defined $value && UNIVERSAL::isa($value, 'forks::BerkeleyDB::shared::Elem::NotExists') ? 0 : 1;
+	return defined $value && UNIVERSAL::isa($value, 'forks::BerkeleyDB::ElemNotExists') ? 0 : 1;
 }
 
 sub _db_filter_array_elem_not_exists_to_undef ($) {
@@ -74,7 +75,7 @@ sub STORESIZE {
 	my $nkeys = $self->FETCHSIZE();
 #warn "STORESIZE: count=$count; nkeys=$nkeys";
 	if ($nkeys < $count) { #add undef elements
-		my $value = forks::BerkeleyDB::shared::Elem::NotExists->new();
+		my $value = forks::BerkeleyDB::ElemNotExists->new();
 		$self->db_put($_, $value, DB_APPEND) for ($nkeys..($count - 1));
 	}
 	elsif ($nkeys > $count) { #trim elements
@@ -114,7 +115,7 @@ sub DELETE {	#doesn't appear to support deleting entire array (delete @a[0..$#a]
 		return undef unless $cursor->c_del() == 0;
 	}
 	else { #initialize element to "not exists" state
-		my $new_value = forks::BerkeleyDB::shared::Elem::NotExists->new();
+		my $new_value = forks::BerkeleyDB::ElemNotExists->new();
 #warn "DELETE: success!";
 		return undef unless $cursor->c_put($key, $new_value, DB_CURRENT) == 0;
 	}
@@ -273,7 +274,7 @@ __END__
 
 =head1 NAME
 
-forks::BerkeleyDB::shared::hash - class for tie-ing arrays to BerkeleyDB Recno
+forks::BerkeleyDB::shared::array - class for tie-ing arrays to BerkeleyDB Recno
 
 =head1 DESCRIPTION
 

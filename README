@@ -6,12 +6,13 @@ has some significant differences:
 
 - you do _not_ need a special (threaded) version of Perl
 - it is _much_ more economic with memory usage on OS's that support COW.
-  Additionally, it uses local temp filesystem space for most shared variable
+  Additionally, it uses local temp filesystem space for shared variable
   data, so memory savings are at a premium when dealing with very large
   shared variables
 - it is more efficient in the startup of threads
 - it is slightly less efficient in the stopping of threads
-- it is less efficient in inter-thread communication
+- it is slightly less efficient in shared variable data operations
+- it is less efficient in shared variable locking and signaling
 
 Copyright (c) 2006 Eric Rybski <rybskej@yahoo.com>.
 All rights reserved.  This program is free software; you can redistribute it

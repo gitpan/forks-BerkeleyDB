@@ -1,2 +1,27 @@
+0.02	6 August 2006
+	Implemented transparent bless across threads (note: feature will be silently
+	disabled unless forks.pm >= 0.19 is installed).
+	
+	Updated test suite to match complete forks 0.19 set of tests (including blessed
+	object tests).
+	
+	Implemented separate config module to allow access to global constants between
+	packages.
+	
+	Moved base BDB base environment to BerkeleyDB.pm (was originally in shared.pm).
+	
+	Reworked some internals to better handle overriding of function calls, when
+	necessary by other support modules.
+	
+	Implemented Scalar::Util::reftype instead of ref() in internal function
+	_filter_store_value to correctly support blessed references.
+	
+	Enabled database syncing in shared.pm END block to improve data integrity.
+	
+	Corrected minor POD bug in forks::BerkeleyDB::shared::array.
+	
+	Corrected a few file text formats to prevent inconsistencies between package
+	signature and package contents.
+
 0.01	25 April 2006
 	First public version.

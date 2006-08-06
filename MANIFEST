@@ -1,5 +1,7 @@
 Changes
 lib/forks/BerkeleyDB.pm
+lib/forks/BerkeleyDB/Config.pm
+lib/forks/BerkeleyDB/ElemNotExists.pm
 lib/forks/BerkeleyDB/shared.pm
 lib/forks/BerkeleyDB/shared/array.pm
 lib/forks/BerkeleyDB/shared/handle.pm
@@ -13,3 +15,5 @@ SIGNATURE
 t/forks01.t
 t/forks02.t
 t/forks03.t
+t/forks20.t
+t/forks99.t
