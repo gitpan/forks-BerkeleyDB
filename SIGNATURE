@@ -1,5 +1,5 @@
 This file contains message digests of all files listed in MANIFEST,
-signed via the Module::Signature module, version 0.54.
+signed via the Module::Signature module, version 0.55.
 
 To verify the content in this distribution, first make sure you have
 Module::Signature installed, then type:
@@ -14,19 +14,19 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 f80134df712c939d31fbfa3715c83cf3e027ebec Changes
+SHA1 80022f0bbd1fdc8309212f66786917409845576a Changes
 SHA1 ff63e2bc7d51eb6accfb28cc4869728e2f462de0 MANIFEST
-SHA1 764db3dc965196c341834a231a4328f6bfc7f969 META.yml
+SHA1 53ca358181bde5839f3578d10a6d584dd6b51880 META.yml
 SHA1 5c2a861d0f73583e1382180e41397d679aad643b Makefile.PL
 SHA1 69b587ff462db2c5d8dcee8cc68fb94c5d51f61a README
-SHA1 44de4188e6cd1934d7359b95f887e8d495d6acbb lib/forks/BerkeleyDB.pm
-SHA1 2ecf2f39178d030df575c34677d74270aa3bfecd lib/forks/BerkeleyDB/Config.pm
-SHA1 fa9b360decd0e782889d98650e45c906068b5a48 lib/forks/BerkeleyDB/ElemNotExists.pm
-SHA1 0c88b25f476b6e21450c1d2247af2f6bb9af5bac lib/forks/BerkeleyDB/shared.pm
-SHA1 7eba5cd334e5513475fab4f37e1e79dfa6172404 lib/forks/BerkeleyDB/shared/array.pm
-SHA1 a72384bd1f837f50033cc04dd7848b9f9a3e7365 lib/forks/BerkeleyDB/shared/handle.pm
-SHA1 e1356f19c14fcb5cadc624de25b49ef94a409f1d lib/forks/BerkeleyDB/shared/hash.pm
-SHA1 318993dfd8a087048b89c9cb57031398a0f02fb9 lib/forks/BerkeleyDB/shared/scalar.pm
+SHA1 b88743a07b1cf3adab68bd8580254c0026ccfcce lib/forks/BerkeleyDB.pm
+SHA1 f87149b02a37d059fac8c77d87aa84518ab226b1 lib/forks/BerkeleyDB/Config.pm
+SHA1 f927e5d82a4177182508cfd81a13a1b930a631ac lib/forks/BerkeleyDB/ElemNotExists.pm
+SHA1 2903682deaea42e561d698d4511af18e74534392 lib/forks/BerkeleyDB/shared.pm
+SHA1 f4b6dab9741a5b14cf1a819b0eb9f525d71310ef lib/forks/BerkeleyDB/shared/array.pm
+SHA1 b474efb25ae0e8c39fde23f4d6ae40e084f9252c lib/forks/BerkeleyDB/shared/handle.pm
+SHA1 afe831c3ca1f4601c2490ece0656fa88d278ba37 lib/forks/BerkeleyDB/shared/hash.pm
+SHA1 e7cfd08f4a7611c1f111ceb374b53b742e5cb6ed lib/forks/BerkeleyDB/shared/scalar.pm
 SHA1 86a45fc774661b1676c607f225dad74e5053fdb9 t/forks01.t
 SHA1 16547aab744eb714f13206161623cbb12aad617d t/forks02.t
 SHA1 22c8e06dc63f3967cb7511815274aea18ab5acf8 t/forks03.t
@@ -35,7 +35,7 @@ SHA1 0cbabe5534118d746aa8a4d5e3e55d306f2ddc45 t/forks99.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.2.1 (Cygwin)
 
-iD8DBQFE1lQ6Qwn7DcpJEO4RAhmHAJ9Kqe3TzOyYYtkKuCSpBwVI8mrJ6gCfdBjM
-0oUOI4FhR+EPF8DzPqJldzA=
-=Qdtn
+iD8DBQFFJb2WQwn7DcpJEO4RAhaDAJ9T5KEBU/FllimBu/z8DkKANbEXngCgyViI
+3wy1q8UBetTBtVxfvl3nPVY=
+=Xw/D
 -----END PGP SIGNATURE-----

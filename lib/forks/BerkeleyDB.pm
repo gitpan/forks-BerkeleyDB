@@ -1,6 +1,14 @@
+package
+	CORE::GLOBAL;	#hide from PAUSE
+use subs qw(fork);
+{
+	no warnings 'redefine';
+	*fork = \&forks::BerkeleyDB::_fork;
+}
+
 package forks::BerkeleyDB;
 
-$VERSION = 0.02;
+$VERSION = 0.03;
 use forks::BerkeleyDB::Config;
 use BerkeleyDB 0.27;
 use Storable qw(freeze thaw);
@@ -16,10 +24,16 @@ BEGIN {
 
 	sub _open_env () {
 		### open the base environment ###
-		return new BerkeleyDB::Env(
+		return $bdb_env = new BerkeleyDB::Env(
 			-Home  => ENV_PATH,
 			-Flags => DB_INIT_CDB | DB_CREATE | DB_INIT_MPOOL,
 		) or _croak( "Can't create BerkeleyDB::Env (home=".ENV_PATH."): $BerkeleyDB::Error" );
+	}
+
+	sub _close_env () {
+		### close and undefine the base environment ###
+		$bdb_env->close() if defined $bdb_env && UNIVERSAL::isa($_[0], 'BerkeleyDB::Env');
+		$bdb_env = undef;
 	}
 
 	sub _purge_env () {
@@ -44,26 +58,23 @@ BEGIN {
 	
 	sub _fork {
 		### safely sync & close databases, close environment ###
-		forks::BerkeleyDB::_untie_support_vars();
-		$forks::BerkeleyDB::bdb_env = undef;
+		_untie_support_vars();
+		_close_env();
 		
 		### do the fork ###
 		my $pid = CORE::fork;
 
 		if (!defined $pid || $pid) { #in parent
 			### re-open environment and immediately retie to critical databases ###
-			$forks::BerkeleyDB::bdb_env = forks::BerkeleyDB::_open_env();
-			forks::BerkeleyDB::_tie_support_vars();
+			_open_env();
+			_tie_support_vars();
 		}
 				
 		return $pid;
 	};
-
-	{
-		no warnings 'redefine';
-		*CORE::GLOBAL::fork = \&_fork;
-	}
 	
+	*import = *import = \&forks::import;
+
 	### create/purge necessary paths to create clean environment ###
 	if (-d ENV_PATH) {
 		_purge_env();
@@ -77,55 +88,19 @@ BEGIN {
 	}
 
 	### create the base environment ###
-	$bdb_env = forks::BerkeleyDB::_open_env();
+	_open_env();
 	_tie_support_vars();
 }
 
 END {
-	_untie_support_vars();
-	$bdb_env = undef;
+	eval { _untie_support_vars(); };
+	eval { _close_env(); };
 	#also remove database if no threads connected to any databases (maybe use recno DB to monitor num of threads connected per shared var)?
 }
 
-*import = *import = \&forks::import;
-
 sub CLONE {	#reopen environment and immediately retie to critical databases
-	$bdb_env = _open_env();
+	_open_env();
 	_tie_support_vars();
-}
-
-########################################################################
-### overload some subs and methods in forks and forks::shared ###
-{
-	no warnings 'redefine';	#allow overloading without warnings
-
-	*_ORIG_new = *_ORIG_new = \&threads::new;
-	*threads::new = \&_new;
-	
-	sub _new {
-		my $class = shift;
-
-		### safely sync & close databases, close environment ###
-		forks::BerkeleyDB::_untie_support_vars();
-		$forks::BerkeleyDB::bdb_env = undef;
-		
-		### do whatever threads::new usually does ###
-		my @result = _ORIG_new($class, @_);
-		
-		### re-open environment and immediately retie to critical databases ###
-		$forks::BerkeleyDB::bdb_env = forks::BerkeleyDB::_open_env();
-		forks::BerkeleyDB::_tie_support_vars();
-		
-		return wantarray ? @result : $result[0];
-	};
-
-	*_ORIG_isthread = *_ORIG_isthread = \&threads::isthread;
-	*threads::isthread = \&_isthread;
-
-	sub _isthread {
-		forks::BerkeleyDB::_ORIG_isthread(@_);
-		forks::BerkeleyDB::CLONE();	#retie shared vars
-	};
 }
 
 1;
@@ -185,24 +160,28 @@ Testing has been performed against BerkeleyDB 4.3.x.  Full compatibility is expe
 BDB 4.x and likely with 3.x as well.  Unclear if all tie methods are compatible with 2.x.
 This module is currently not compatible with BDB 1.x.
 
-On thread spawn, all existing bdb connections and the environment are closed prior to
-the fork.  This may be an unnecessary step (e.g. it may be safe to simply re-open these
-in the child after the fork) but is currently done as a precaution.
-
 =head1 CAVIATS
 
 Environment and database files aren't currently purged after application exits.  Files are
 unlinked if they ever collide with a new process' shared vars, and care has gone into insuring
 that no two running processes will ever collide, so it is not a critical issue. This will
-probably be resolved in the future by storing shared var therad usage in a separate database,
+probably be resolved in the future by storing shared var thread usage in a separate database,
 and auto-purging when thus db refcount drops to 0 (in an END block to insure it cleanup
 occurs as frequently as possible.
 
-This module overrides CORE::GLOBAL::fork to insure BerkeleyDB resources are correctly managed
+This module defines CORE::GLOBAL::fork to insure BerkeleyDB resources are correctly managed
 before and after a fork occurs.  This insures that processes will be able to safely use
 threads->isthread.  You may encounter issues with your application or other modules it uses
-also override CORE::GLOBAL::fork.  To work around this, you should either modify your 
-CORE::GLOBAL::fork to support chaining or avoid modifying CORE::GLOBAL::fork altogether.
+also define CORE::GLOBAL::fork.  To work around this, you should modify your CORE::GLOBAL::fork
+to support chaining, like the following
+
+	use subs 'fork';
+	*_oldfork = \&CORE::GLOBAL::fork;
+	sub fork {
+		#your code here
+		...
+		_oldfork->() if ref(*oldfork) eq 'SUB';
+	}
 
 =head1 TODO
 

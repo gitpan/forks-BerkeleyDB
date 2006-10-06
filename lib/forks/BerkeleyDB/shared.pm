@@ -1,6 +1,14 @@
+package
+	CORE::GLOBAL;	#hide from PAUSE
+use subs qw(fork);
+{
+	no warnings 'redefine';
+	*fork = \&forks::BerkeleyDB::shared::_fork;
+}
+
 package forks::BerkeleyDB::shared;
 
-$VERSION = 0.02;
+$VERSION = 0.03;
 use strict;
 use warnings;
 use forks::BerkeleyDB::Config;
@@ -35,7 +43,7 @@ sub _filter_fetch_value {
 		}
 		else {	#is a shared var, retie to same shared ordinal
 #warn Dumper($_, $object_refs{$_}, defined $shared_cache[$_] ? thaw($shared_cache[$_]) : undef) if DEBUG;
-			if (!defined $object_refs{$_} || !defined $object_refs{$_}->{bdb_reconnect} || $object_refs{$_}->{bdb_reconnect}) {	#shared var created outside scope of this thread or needs to be reloaded: load object from shared var cache & reconnect to db
+			if (!defined $object_refs{$_} || !defined $object_refs{$_}->{bdb_is_connected} || !$object_refs{$_}->{bdb_is_connected}) {	#shared var created outside scope of this thread or needs to be reloaded: load object from shared var cache & reconnect to db
 #warn "*********".threads->tid().": _filter_fetch_value -> obj \#$_ recreated\n"; #if DEBUG;
 				my $obj = defined $object_refs{$_} && defined $object_refs{$_}->{bdb_module} 
 					? $object_refs{$_}
@@ -121,31 +129,32 @@ BEGIN {
 		untie @shared_cache_attr_bless;
 	}
 	
-	*_ORIG_fork = *_ORIG_fork = \&CORE::GLOBAL::fork;
-
 	sub _fork {
 		### safely sync & close databases ###
 		{
 			local $@;
-			foreach my $key (keys %forks::BerkeleyDB::shared::object_refs) {
-#				eval { $forks::BerkeleyDB::shared::object_refs{$key}->{bdb}->db_sync(); };
-				eval { $forks::BerkeleyDB::shared::object_refs{$key}->{bdb}->db_close(); };
-				$object_refs{$key}->{bdb_reconnect} = 1;	#hint that this object must be recreated from cache
+			foreach my $key (keys %object_refs) {
+				if ($object_refs{$key}->{bdb_is_connected}) {
+#					eval { $object_refs{$key}->{bdb}->db_sync(); };
+					eval { $object_refs{$key}->{bdb}->db_close(); };
+					$object_refs{$key}->{bdb_is_connected} = 0;
+				}
+				$object_refs{$key}->{bdb_is_connected} = 0;	#hint that this object must be recreated from cache
 			}
 		}
-		forks::BerkeleyDB::shared::_untie_shared_cache();
+		_untie_shared_cache();
 		
 		### do the fork ###
-		my $pid = _ORIG_fork();
+		my $pid = forks::BerkeleyDB::_fork();
 
 		if (!defined $pid || $pid) { #in parent
 			### immediately retie to critical databases ###
-			forks::BerkeleyDB::shared::_tie_shared_cache();
-#			foreach my $key (keys %forks::BerkeleyDB::shared::object_refs) {
-#				my $sub = 'forks::BerkeleyDB::shared::_tie'.$forks::BerkeleyDB::shared::object_refs{$key}->{type};
+			_tie_shared_cache();
+#			foreach my $key (keys %object_refs) {
+#				my $sub = 'forks::BerkeleyDB::shared::_tie'.$object_refs{$key}->{type};
 #				{
 #					no strict 'refs';
-#					$forks::BerkeleyDB::shared::object_refs{$key} = &{$sub}($forks::BerkeleyDB::shared::object_refs{$key});
+#					$object_refs{$key} = &{$sub}($object_refs{$key});
 #				}
 #			}
 		}
@@ -153,9 +162,31 @@ BEGIN {
 		return $pid;
 	};
 	
+	*import = *import = \&forks::shared::import;
+	
+	*_ORIG_CLONE = *_ORIG_CLONE = \&forks::BerkeleyDB::CLONE;
 	{
 		no warnings 'redefine';
-		*CORE::GLOBAL::fork = \&_fork;
+		*forks::BerkeleyDB::CLONE = \&_CLONE;
+	}
+
+	sub _CLONE {	#reopen environment and immediately retie to critical databases
+		_ORIG_CLONE(@_);
+		_tie_shared_cache();
+	#	local $@;
+	#	foreach my $key (keys %object_refs) {
+	#		if ($object_refs{$key}->{bdb_is_connected}) {
+	##			eval { $object_refs{$key}->{bdb}->db_sync(); };
+	#			eval { $object_refs{$key}->{bdb}->db_close(); };
+	#			$object_refs{$key}->{bdb_is_connected} = 0;
+	#		}
+	#warn "In clone (tid #".threads->tid."): $key -> ".ref($object_refs{$key}) if DEBUG;
+	#		my $sub = '_tie'.$object_refs{$key}->{type};
+	#		{
+	#			no strict 'refs';
+	#			&{$sub}($object_refs{$key});
+	#		}
+	#	}
 	}
 
 	### create the base environment ###
@@ -166,29 +197,15 @@ END {
 	{
 		local $@;
 		foreach my $key (keys %object_refs) {
-			eval { $object_refs{$key}->{bdb}->db_sync(); };
-			eval { $object_refs{$key}->{bdb}->db_close(); };
+			if ($object_refs{$key}->{bdb_is_connected}) {
+#				eval { $object_refs{$key}->{bdb}->db_sync(); };
+				eval { $object_refs{$key}->{bdb}->db_close(); };
+				$object_refs{$key}->{bdb_is_connected} = 0;
+			}
 		}
 	}
-	_untie_shared_cache();
+	eval { _untie_shared_cache(); };
 }
-
-sub CLONE {	#reopen environment and immediately retie to critical databases
-	_tie_shared_cache();
-#	local $@;
-#	foreach my $key (keys %object_refs) {
-##		eval { $object_refs{$key}->{bdb}->db_sync(); };
-#		eval { $object_refs{$key}->{bdb}->db_close(); };
-#warn "In clone (tid #".threads->tid."): $key -> ".ref($object_refs{$key}) if DEBUG;
-#		my $sub = '_tie'.$object_refs{$key}->{type};
-#		{
-#			no strict 'refs';
-#			&{$sub}($object_refs{$key});
-#		}
-#	}
-}
-
-*import = *import = \&forks::shared::import;
 
 ########################################################################
 sub _tiescalar ($) {
@@ -209,7 +226,7 @@ sub _tiescalar ($) {
 	) or _croak( "Can't create bdb $bdb_path" );
 	$obj->{bdb}->filter_fetch_value(\&_filter_fetch_value);
 	$obj->{bdb}->filter_store_value(\&_filter_store_value);
-	$obj->{bdb_reconnect} = 0;
+	$obj->{bdb_is_connected} = 1;
 
 	### store ref in package variable ###
 	$object_refs{$obj->{ordinal}} = $obj;
@@ -237,7 +254,7 @@ sub _tiearray ($) {
 	) or _croak( "Can't create bdb $bdb_path" );
 	$obj->{bdb}->filter_fetch_value(\&_filter_fetch_value);
 	$obj->{bdb}->filter_store_value(\&_filter_store_value);
-	$obj->{bdb_reconnect} = 0;
+	$obj->{bdb_is_connected} = 1;
 	
 	### store ref in package variable ###
 	$object_refs{$obj->{ordinal}} = $obj;
@@ -264,7 +281,7 @@ sub _tiehash ($) {
 	) or _croak( "Can't create bdb $bdb_path" );
 	$obj->{bdb}->filter_fetch_value(\&_filter_fetch_value);
 	$obj->{bdb}->filter_store_value(\&_filter_store_value);
-	$obj->{bdb_reconnect} = 0;
+	$obj->{bdb_is_connected} = 1;
 	
 	### store ref in package variable ###
 	$object_refs{$obj->{ordinal}} = $obj;
@@ -280,7 +297,7 @@ sub _tiehandle ($) {
 
 	$obj->{bdb_module} = __PACKAGE__.'::'.$obj->{type};
 	$obj->{bdb} = undef;
-	$obj->{bdb_reconnect} = 0;
+	$obj->{bdb_is_connected} = 1;
 	
 	### store ref in package variable ###
 	$object_refs{$obj->{ordinal}} = $obj;
@@ -292,47 +309,6 @@ sub _tiehandle ($) {
 ### overload some subs and methods in forks and forks::shared ###
 {
 	no warnings 'redefine';	#allow overloading without warnings
-
-	*_ORIG_new = *_ORIG_new = \&threads::new;
-	*threads::new = \&_new;
-	
-	sub _new {
-		my $class = shift;
-
-		### safely sync & close databases ###
-		{
-			local $@;
-			foreach my $key (keys %forks::BerkeleyDB::shared::object_refs) {
-#				eval { $object_refs{$key}->{bdb}->db_sync(); };
-				eval { $object_refs{$key}->{bdb}->db_close(); };
-				$object_refs{$key}->{bdb_reconnect} = 1;	#hint that this object must be recreated from cache
-			}
-		}
-		forks::BerkeleyDB::shared::_untie_shared_cache();
-		
-		### do whatever threads::new usually does ###
-		my @result = _ORIG_new($class, @_);
-		
-		### immediately retie to critical databases ###
-		forks::BerkeleyDB::shared::_tie_shared_cache();
-#		foreach my $key (keys %forks::BerkeleyDB::shared::object_refs) {
-#			my $sub = 'forks::BerkeleyDB::shared::_tie'.$object_refs{$key}->{type};
-#			{
-#				no strict 'refs';
-#				&{$sub}($object_refs{$key});
-#			}
-#		}
-		
-		return wantarray ? @result : $result[0];
-	};
-	
-	*_ORIG_isthread = *_ORIG_isthread = \&threads::isthread;
-	*threads::isthread = \&_isthread;
-
-	sub _isthread {
-		forks::BerkeleyDB::shared::_ORIG_isthread(@_);
-		forks::BerkeleyDB::shared::CLONE();	#retie shared vars
-	};
 
 	sub threads::shared::_bless {
 		my $it  = shift;
@@ -383,7 +359,7 @@ sub _tiehandle ($) {
 
 	sub threads::shared::AUTOLOAD {
 		my $self = shift;
-		if (!defined $self->{bdb_reconnect} || $self->{bdb_reconnect}) {	#shared var needs to be reloaded: load shared var cache & connect to db
+		if (!defined $self->{bdb_is_connected} || !$self->{bdb_is_connected}) {	#shared var needs to be reloaded: load shared var cache & connect to db
 #warn "*********".threads->tid().": threads::shared::AUTOLOAD -> obj \#$self->{ordinal}\n"; #if DEBUG;
 			my $obj = defined $object_refs{$self->{ordinal}} && defined $object_refs{$self->{ordinal}}->{bdb_module} 
 				? $object_refs{$self->{ordinal}}
@@ -428,6 +404,7 @@ sub _tiehandle ($) {
 				no strict 'refs';
 				@result = &{$sub}(@_);
 			}
+			$self->{bdb_is_connected} = 0;
 		}
 		delete $object_refs{$self->{ordinal}};
 		threads::shared::_command( '_tied',$self->{'ordinal'},$self->{'module'}.'::DESTROY' );
@@ -470,7 +447,8 @@ forks::BerkeleyDB::shared is a drop-in replacement for L<threads::shared>, writt
 extension of L<forks::shared>.  The goal of this module improve upon the core performance
 of L<forks::shared> at a level comparable to native ithreads (L<threads::shared>).
 
-Depending on how you architect your data processing, you should expect to achieve approx 75%
+Depending on how you architect your data processing, as well as how your target platform
+filesystem has been configured and tuned, you should expect to achieve around 75%
 the performance of native ithreads for all shared variable operations.  Given that this
 module is written entirely in pure perl, this is an outstanding benchmark and is a testament
 to the performance of BerkeleyDB.  Performance could likely be further improved by migrating
@@ -489,6 +467,9 @@ performance, use a partition with a physical drive dedicate for tempory space us
 
 =head1 NOTES
 
+Forks 0.19 or later is required to support transparent blessing across threads.  This feature
+will be silently disabled if this requirement is not met.
+
 Currently optimizes SCALAR, ARRAY, and HASH shared variables.  HANDLE type is supported 
 using the default method implemented by L<forks::shared>.
 
@@ -501,11 +482,6 @@ may not be what you expect.
 When share is used on arrays, hashes, array refs or hash refs, any data they contain will 
 be lost.  This correctly models the expected behavior of L<threads>, but not (currently) 
 of L<forks>.
-
-=head1 CAVIATS
-
-Forks 0.19 or later is required to support transparent blessing across threads.  This feature
-will be silently disabled if this requirement is not met.
 
 =head1 TODO
 

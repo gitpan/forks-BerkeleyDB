@@ -1,3 +1,12 @@
+0.03	5 October 2006
+	Corrected method by which CORE::GLOBAL::fork was overridden--now it really is
+	working correctly (at compile-time).
+	
+	Signifigantly cleaned up and further optimized pre/post thread spawn logic.
+	
+	Corrected slow memory leak in threads whenever they would spawn new threads,
+	caused by BerkeleyDB XS-level cleanup that was being inadvertantly skipped.
+
 0.02	6 August 2006
 	Implemented transparent bless across threads (note: feature will be silently
 	disabled unless forks.pm >= 0.19 is installed).

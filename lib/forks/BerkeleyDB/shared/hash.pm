@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared::hash;
 
-$VERSION = 0.02;
+$VERSION = 0.03;
 use strict;
 use warnings;
 use BerkeleyDB 0.27;
@@ -102,18 +102,13 @@ sub SCALAR {
 #---------------------------------------------------------------------------
 sub UNTIE {
 	my $self = shift;
-	my $status = eval { $self->db_sync(); };
-	$status = eval { $self->db_close(); };
-	return defined $status && $status == 0 ? 0 : 1;
+	eval { $self->db_sync(); };
 }
 
 sub DESTROY {
 	my $self = shift;
-	my $status = eval { $self->db_sync(); };
-#my $warn = threads->tid.": In DESTROY hash: ".(defined $status ? $status : '');
-	$status = eval { $self->db_close(); };
-#warn $warn.(defined $status ? ", $status" : '');
-	return defined $status && $status == 0 ? 0 : 1;
+#	eval { $self->db_sync(); };
+	$self->SUPER::DESTROY(@_) if $self;
 }
 
 #---------------------------------------------------------------------------
