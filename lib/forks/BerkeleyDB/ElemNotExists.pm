@@ -1,13 +1,19 @@
 package
 	forks::BerkeleyDB::ElemNotExists;	#hide from PAUSE
 
-$VERSION = 0.03;
+$VERSION = 0.04;
 use strict;
 use warnings;
 
-sub new {
+my $instance = __PACKAGE__->_new();
+
+sub _new {
 	my $type = shift;
 	return CORE::bless(\do { my $o }, ref($type) || $type);
+}
+
+sub instance {
+	return $instance;
 }
 
 1;

@@ -1,3 +1,7 @@
+package forks::BerkeleyDB::shared;
+
+$VERSION = 0.04;
+
 package
 	CORE::GLOBAL;	#hide from PAUSE
 use subs qw(fork);
@@ -8,7 +12,6 @@ use subs qw(fork);
 
 package forks::BerkeleyDB::shared;
 
-$VERSION = 0.03;
 use strict;
 use warnings;
 use forks::BerkeleyDB::Config;
@@ -19,7 +22,6 @@ use Scalar::Util qw(blessed reftype);
 #use Scalar::Util qw(weaken);
 
 use constant DEBUG => forks::BerkeleyDB::Config::DEBUG();
-use constant ENV_ROOT => forks::BerkeleyDB::Config::ENV_ROOT();
 use constant ENV_PATH => forks::BerkeleyDB::Config::ENV_PATH();
 #use Data::Dumper;
 
@@ -35,7 +37,7 @@ sub _filter_fetch_value {
 #warn "output: '$_', defined=",defined $_,",length=",length $_ if DEBUG;
 	if (!defined $_ || length $_ == 0) { $_ = undef; }
 	elsif (length $_ == 1 && $_ eq ELEM_NOT_EXISTS) {
-		$_ = forks::BerkeleyDB::ElemNotExists->new();
+		$_ = forks::BerkeleyDB::ElemNotExists->instance();
 	}
 	else {
 		if (substr($_, -1) eq TERMINATOR) {	#regular data value
@@ -377,6 +379,11 @@ sub _tiehandle ($) {
 		my @result;
 		@result = $self->{'bdb'}->$sub(@_) if defined $self->{'bdb'};
 		wantarray ? @result : $result[0];
+	}
+	
+	sub threads::shared::SPLICE {
+		$threads::shared::AUTOLOAD = 'threads::shared::SPLICE';
+		threads::shared::AUTOLOAD(@_);
 	}
 
 	sub threads::shared::UNTIE {

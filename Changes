@@ -1,3 +1,23 @@
+0.04	9 April 2007
+	Fixed incompatible splice() on shared array with forks 0.21 and later.
+	
+	Added auto-cleanup of shared variable data at process exit if using
+	forks.pm 0.23 or later.
+	
+	Updated support for CORE::GLOBAL::fork of forks 0.22 and later.
+
+	Improved management of temp dir hierarchy for greater filesystem portability
+	(e.g. to insure that max inodes are not exceeded for num folders in a folder).
+	
+	Shared variable data cleanup now performed in reverse order of file creation
+	(so BDB environment files are deleted last, as a precaution).
+	
+	Performance improvement regarding undefined shared array values:
+	ElemNotExists.pm is now a singleton class (to eliminate unnecessary object
+	instantiation costs).
+	
+	Now using Devel::Required module as part of build process.
+
 0.03	5 October 2006
 	Corrected method by which CORE::GLOBAL::fork was overridden--now it really is
 	working correctly (at compile-time).

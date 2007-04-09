@@ -1,12 +1,13 @@
 # http://module-build.sourceforge.net/META-spec.html
 #XXXXXXX This is a prototype!!!  It will change in the future!!! XXXXX#
 name:         forks-BerkeleyDB
-version:      0.03
+version:      0.04
 version_from: lib/forks/BerkeleyDB.pm
 installdirs:  site
 requires:
     BerkeleyDB:                    0.27
-    forks:                         0
+    Devel::Required:               0.07
+    forks:                         0.18
     Storable:                      0
     Tie::Restore:                  0.11
 

@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared::array;
 
-$VERSION = 0.03;
+$VERSION = 0.04;
 use strict;
 use warnings;
 use BerkeleyDB 0.27;
@@ -75,7 +75,7 @@ sub STORESIZE {
 	my $nkeys = $self->FETCHSIZE();
 #warn "STORESIZE: count=$count; nkeys=$nkeys";
 	if ($nkeys < $count) { #add undef elements
-		my $value = forks::BerkeleyDB::ElemNotExists->new();
+		my $value = forks::BerkeleyDB::ElemNotExists->instance();
 		$self->db_put($_, $value, DB_APPEND) for ($nkeys..($count - 1));
 	}
 	elsif ($nkeys > $count) { #trim elements
@@ -115,7 +115,7 @@ sub DELETE {	#doesn't appear to support deleting entire array (delete @a[0..$#a]
 		return undef unless $cursor->c_del() == 0;
 	}
 	else { #initialize element to "not exists" state
-		my $new_value = forks::BerkeleyDB::ElemNotExists->new();
+		my $new_value = forks::BerkeleyDB::ElemNotExists->instance();
 #warn "DELETE: success!";
 		return undef unless $cursor->c_put($key, $new_value, DB_CURRENT) == 0;
 	}

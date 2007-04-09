@@ -1,26 +1,45 @@
+package forks::BerkeleyDB;
+
+$VERSION = 0.04;
+
 package
 	CORE::GLOBAL;	#hide from PAUSE
 use subs qw(fork);
 {
 	no warnings 'redefine';
+	$forks::BerkeleyDB::_parent_fork = \&fork
+		if defined($forks::VERSION) && $forks::VERSION >= 0.22;
 	*fork = \&forks::BerkeleyDB::_fork;
 }
 
 package forks::BerkeleyDB;
 
-$VERSION = 0.03;
 use forks::BerkeleyDB::Config;
 use BerkeleyDB 0.27;
 use Storable qw(freeze thaw);
 
 use constant DEBUG => forks::BerkeleyDB::Config::DEBUG();
 use constant ENV_ROOT => forks::BerkeleyDB::Config::ENV_ROOT();
+use constant ENV_SUBPATH => forks::BerkeleyDB::Config::ENV_SUBPATH();
 use constant ENV_PATH => forks::BerkeleyDB::Config::ENV_PATH();
 
 our $bdb_env;	#berkeleydb environment
 
 BEGIN {
-	use forks (); die "forks version 0.18 required--this is only version $threads::VERSION" unless $threads::VERSION >= 0.18;
+	use forks (); die "forks version 0.18 required--this is only version $threads::VERSION"
+		unless defined($forks::VERSION) && $forks::VERSION >= 0.18;
+	
+	*_croak = *_croak = \&threads::_croak;
+	{
+		no warnings 'redefine';
+		*threads::_end_server_post_shutdown = *threads::_end_server_post_shutdown
+			= sub {
+				eval {
+					forks::BerkeleyDB::_purge_env();
+				};
+			}
+			if defined($forks::VERSION) && $forks::VERSION >= 0.23;
+	}
 
 	sub _open_env () {
 		### open the base environment ###
@@ -38,7 +57,7 @@ BEGIN {
 
 	sub _purge_env () {
 		opendir(ENVDIR, ENV_PATH);
-		my @files_to_del = grep(!/^(\.|\.\.)$/, readdir(ENVDIR));
+		my @files_to_del = reverse grep(!/^(\.|\.\.)$/, readdir(ENVDIR));
 		closedir(ENVDIR);
 		warn "unlinking: ".join(', ', map(ENV_PATH."/$_", @files_to_del)) if DEBUG;
 		foreach (@files_to_del) {
@@ -62,7 +81,7 @@ BEGIN {
 		_close_env();
 		
 		### do the fork ###
-		my $pid = CORE::fork;
+		my $pid = defined($_parent_fork) ? $_parent_fork->() : CORE::fork;
 
 		if (!defined $pid || $pid) { #in parent
 			### re-open environment and immediately retie to critical databases ###
@@ -80,11 +99,13 @@ BEGIN {
 		_purge_env();
 	}
 	else {
-		unless (-d ENV_ROOT) {
-			my $status = mkdir ENV_ROOT, 0777;
+		my $curpath = '';
+		foreach (split(/\//o, ENV_PATH)) {
+			$curpath .= $_ eq '' ? '/' : "$_/";
+			next if -d $curpath;
+			my $status = mkdir $curpath, 0777;
 			_croak( "Can't create directory ".ENV_ROOT ) unless $status;
 		}
-		mkdir ENV_PATH, 0777 or _croak( "Can't create directory ".ENV_PATH );
 	}
 
 	### create the base environment ###
@@ -111,6 +132,10 @@ __END__
 =head1 NAME
 
 forks::BerkeleyDB - high-performance drop-in replacement for threads
+
+=head1 VERSION
+
+This documentation describes version 0.04.
 
 =head1 SYNOPSYS
 
@@ -149,6 +174,14 @@ forks::BerkeleyDB - high-performance drop-in replacement for threads
 forks::BerkeleyDB is a drop-in replacement for threads, written as an extension of L<forks>.
 The goal of this module is to improve upon the core performance of L<forks> at a level
 comparable to native ithreads.
+
+=head1 REQUIRED MODULES
+
+ BerkeleyDB (0.27)
+ Devel::Required (0.07)
+ forks (0.18)
+ Storable (any)
+ Tie::Restore (0.11)
 
 =head1 USAGE
 
@@ -191,6 +224,11 @@ Implement thread joined data using BerkeleyDB.
 
 Determine what additional functions should be migrated to BerkeleyDB backend vs. those that
 should remain as part of the forks package.
+
+Add a high security mode, where all BerkeleyDB data is encrypted using either
+native encryption (preferred, if available) or an external cryptography module
+of the user's choice (i.e. Crypt::* interface module, or something that
+supports a standard interface given an object instance).
 
 =head1 AUTHOR
 

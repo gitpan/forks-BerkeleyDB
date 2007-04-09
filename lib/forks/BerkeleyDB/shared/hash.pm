@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared::hash;
 
-$VERSION = 0.03;
+$VERSION = 0.04;
 use strict;
 use warnings;
 use BerkeleyDB 0.27;
