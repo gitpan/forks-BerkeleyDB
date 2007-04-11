@@ -1,7 +1,7 @@
 package
 	forks::BerkeleyDB::Config;	#hide from PAUSE
 
-$VERSION = 0.04;
+$VERSION = 0.05;
 use File::Spec;
 
 use constant DEBUG => 0;

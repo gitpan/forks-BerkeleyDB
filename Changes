@@ -1,3 +1,6 @@
+0.05	10 April 2007
+	Corrected package SIGNATURE file.
+
 0.04	9 April 2007
 	Fixed incompatible splice() on shared array with forks 0.21 and later.
 	

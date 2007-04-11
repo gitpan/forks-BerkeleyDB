@@ -3,7 +3,7 @@ package forks::BerkeleyDB::shared::handle;
 # Make sure we have version info for this module
 # Make sure we do everything by the book from now on
 
-$VERSION = 0.04;
+$VERSION = 0.05;
 use strict;
 use warnings;
 

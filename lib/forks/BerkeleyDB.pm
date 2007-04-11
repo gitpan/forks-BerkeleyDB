@@ -1,6 +1,6 @@
 package forks::BerkeleyDB;
 
-$VERSION = 0.04;
+$VERSION = 0.05;
 
 package
 	CORE::GLOBAL;	#hide from PAUSE
@@ -135,7 +135,7 @@ forks::BerkeleyDB - high-performance drop-in replacement for threads
 
 =head1 VERSION
 
-This documentation describes version 0.04.
+This documentation describes version 0.05.
 
 =head1 SYNOPSYS
 

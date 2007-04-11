@@ -1,7 +1,7 @@
 README for forks::BerkeleyDB
 
 Version:
- 0.04
+ 0.05
 
 This module is a drop-in replacement for threads.pm.  It has the
 same syntax as the threads.pm module (it even takes over its namespace) but
