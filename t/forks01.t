@@ -64,7 +64,7 @@ SKIP: {
 
 unless (my $pid = fork) {
   threads->isthread if defined($pid);
-  exit;
+  threads->can('exit') ? threads->exit : exit;
 }
 sleep 3; # make sure fork above has started to ensure tid's are in sync
 

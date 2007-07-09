@@ -1,6 +1,6 @@
 package forks::BerkeleyDB;
 
-$VERSION = 0.05;
+$VERSION = 0.051;
 
 package
 	CORE::GLOBAL;	#hide from PAUSE
@@ -135,7 +135,7 @@ forks::BerkeleyDB - high-performance drop-in replacement for threads
 
 =head1 VERSION
 
-This documentation describes version 0.05.
+This documentation describes version 0.051.
 
 =head1 SYNOPSYS
 
@@ -236,7 +236,7 @@ Eric Rybski <rybskej@yahoo.com>.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2006 Eric Rybski <rybskej@yahoo.com>.
+Copyright (c) 2006-2007 Eric Rybski <rybskej@yahoo.com>.
 All rights reserved.  This program is free software; you can redistribute it
 and/or modify it under the same terms as Perl itself.
 

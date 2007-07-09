@@ -14,20 +14,20 @@ not run its Makefile.PL or Build.PL.
 -----BEGIN PGP SIGNED MESSAGE-----
 Hash: SHA1
 
-SHA1 aabd2d3f36685d2341c5c14583a2281af2639ab9 Changes
+SHA1 bfa948352f84cba5d4bb998a0b97ee60dd11a3c9 Changes
 SHA1 ff63e2bc7d51eb6accfb28cc4869728e2f462de0 MANIFEST
-SHA1 6df9b39aa78049016bbe2405fcc58bddee975743 META.yml
+SHA1 71325e5a997ea1b58084f1059c8f928a206ed088 META.yml
 SHA1 9b7c8f94bbd1342db9f34a070c1af3783fd9c9af Makefile.PL
-SHA1 69c173437cb3df8f4295c867d854b390ca689afd README
-SHA1 803a7a280a02faec7a14ce6974d33c8bec792c39 lib/forks/BerkeleyDB.pm
-SHA1 96394ef21e35a3f506542c7a0d05dfb721073b71 lib/forks/BerkeleyDB/Config.pm
-SHA1 505e28efc4ec644ab53551e112016cebf371d659 lib/forks/BerkeleyDB/ElemNotExists.pm
-SHA1 76d9db24505e6f001300558297affcb9d3019185 lib/forks/BerkeleyDB/shared.pm
-SHA1 a847f921f3d786ef48ed5e8a0b571875e5bfd3e3 lib/forks/BerkeleyDB/shared/array.pm
-SHA1 290be6b010946d5623d6d428992f917a3ef847e8 lib/forks/BerkeleyDB/shared/handle.pm
-SHA1 4ec5833042d70a881d0272565a4f73f7acf74cc3 lib/forks/BerkeleyDB/shared/hash.pm
-SHA1 0fb5c6b32ea059a9de42f02933b0b0c21b695262 lib/forks/BerkeleyDB/shared/scalar.pm
-SHA1 86a45fc774661b1676c607f225dad74e5053fdb9 t/forks01.t
+SHA1 c1cb76fd9a258fdff4ff94a9a09887e051c19847 README
+SHA1 1132ef2aa81f15bdb044910e38d81b33e1d8eda8 lib/forks/BerkeleyDB.pm
+SHA1 a606732f0a2e6eb696763bc4b85880cc9abc850e lib/forks/BerkeleyDB/Config.pm
+SHA1 6889de7c33ab6d9f3f9f462fc6abf55529b0a5bf lib/forks/BerkeleyDB/ElemNotExists.pm
+SHA1 40de638aed18daef71b61b1a958292ba39b9e75f lib/forks/BerkeleyDB/shared.pm
+SHA1 89ed3af859411b180f69e1ab550cb1712b6435bc lib/forks/BerkeleyDB/shared/array.pm
+SHA1 d8a1f3f1c5d002552974e31dd93bebadc803f2cc lib/forks/BerkeleyDB/shared/handle.pm
+SHA1 aabbab9a593afd6be9a087abb8ec4072cb76b89c lib/forks/BerkeleyDB/shared/hash.pm
+SHA1 20917714b5a2c3a36b0782de95eba56b65fd9e85 lib/forks/BerkeleyDB/shared/scalar.pm
+SHA1 e3c5676510c2412327a94996ab7c27f337c7946f t/forks01.t
 SHA1 16547aab744eb714f13206161623cbb12aad617d t/forks02.t
 SHA1 22c8e06dc63f3967cb7511815274aea18ab5acf8 t/forks03.t
 SHA1 9c5d0b278028dabaf0b037ab74f4339f7bdc77c8 t/forks20.t
@@ -35,7 +35,7 @@ SHA1 0cbabe5534118d746aa8a4d5e3e55d306f2ddc45 t/forks99.t
 -----BEGIN PGP SIGNATURE-----
 Version: GnuPG v1.4.5 (Cygwin)
 
-iD8DBQFGHCYqQwn7DcpJEO4RAjqZAJ437fHxNJcjZ5CJSh/JIuXlCAJwjQCgx7kn
-42Hga/U9DIcC9DKEaJt/UPE=
-=mnnu
+iD8DBQFGkp+YQwn7DcpJEO4RAjSfAKCkc9SmYjkOU/OlVmBgKU2/YtARjQCfRrFp
+SyY70jPXR6/yyF6bYnJwyVg=
+=/yq+
 -----END PGP SIGNATURE-----

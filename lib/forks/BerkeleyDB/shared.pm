@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared;
 
-$VERSION = 0.05;
+$VERSION = 0.051;
 
 package
 	CORE::GLOBAL;	#hide from PAUSE
@@ -381,6 +381,11 @@ sub _tiehandle ($) {
 		wantarray ? @result : $result[0];
 	}
 	
+	sub threads::shared::PUSH {
+		$threads::shared::AUTOLOAD = 'threads::shared::PUSH';
+		threads::shared::AUTOLOAD(@_);
+	}
+
 	sub threads::shared::SPLICE {
 		$threads::shared::AUTOLOAD = 'threads::shared::SPLICE';
 		threads::shared::AUTOLOAD(@_);
@@ -452,14 +457,7 @@ forks::BerkeleyDB::shared - high-performance drop-in replacement for threads::sh
 
 forks::BerkeleyDB::shared is a drop-in replacement for L<threads::shared>, written as an
 extension of L<forks::shared>.  The goal of this module improve upon the core performance
-of L<forks::shared> at a level comparable to native ithreads (L<threads::shared>).
-
-Depending on how you architect your data processing, as well as how your target platform
-filesystem has been configured and tuned, you should expect to achieve around 75%
-the performance of native ithreads for all shared variable operations.  Given that this
-module is written entirely in pure perl, this is an outstanding benchmark and is a testament
-to the performance of BerkeleyDB.  Performance could likely be further improved by migrating
-some of the code to XS (especially some of the operator methods in tied module packages).
+of L<forks::shared> at a level reasonably comparable to native ithreads (L<threads::shared>).
 
 =head1 USAGE
 
@@ -503,7 +501,7 @@ Eric Rybski <rybskej@yahoo.com>.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2006 Eric Rybski <rybskej@yahoo.com>.
+Copyright (c) 2006-2007 Eric Rybski <rybskej@yahoo.com>.
 All rights reserved.  This program is free software; you can redistribute it
 and/or modify it under the same terms as Perl itself.
 

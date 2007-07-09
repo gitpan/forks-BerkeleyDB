@@ -1,3 +1,8 @@
+0.051	9 July 2007
+	Minor patch to forks::BerkeleyDB::shared to support forks::shared 0.24.
+	
+	Minor change to test suite to support forks 0.24.
+
 0.05	10 April 2007
 	Corrected package SIGNATURE file.
 
