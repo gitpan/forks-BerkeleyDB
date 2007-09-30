@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared::array;
 
-$VERSION = 0.051;
+$VERSION = 0.052;
 use strict;
 use warnings;
 use BerkeleyDB 0.27;
@@ -39,27 +39,24 @@ sub _exists_elem ($) {
 
 sub _db_filter_array_elem_not_exists_to_undef ($) {
 	my $value = shift;
-	return _exists_elem($value) ? $value : undef;
+	return defined $value && UNIVERSAL::isa($value, 'forks::BerkeleyDB::ElemNotExists') ? undef : $value;
 }
 
 #---------------------------------------------------------------------------
 sub FETCH { 
-	my $self = shift;
-	return undef unless @_;
-	my $value = $self->SUPER::FETCH(@_);
-	return _db_filter_array_elem_not_exists_to_undef($value);
+	my $value = undef;
+	$_[0]->db_get($_[1], $value);
+	return defined $value && UNIVERSAL::isa($value, 'forks::BerkeleyDB::ElemNotExists') ? undef : $value;	#_db_filter_array_elem_not_exists_to_undef
 }
 
 sub STORE { 
-	my $self = shift;
-	my $key = shift;
-	return undef unless @_;
-	my $value = shift;
-	{
+	if (defined $_[2]) {
+		return undef unless $_[0]->db_put($_[1], $_[2]) == 0;
+	} else {
 		no warnings 'uninitialized';
-		return undef unless $self->db_put($key, $value) == 0;
+		return undef unless $_[0]->db_put($_[1], $_[2]) == 0;
 	}
-	return $value; 
+	return $_[2]; 
 }
 
 #---------------------------------------------------------------------------
@@ -155,14 +152,14 @@ sub PUSH {
 sub POP {
 	my $self = shift;
 	my $value = $self->SUPER::POP(@_);
-	return _db_filter_array_elem_not_exists_to_undef($value);
+	return defined $value && UNIVERSAL::isa($value, 'forks::BerkeleyDB::ElemNotExists') ? undef : $value;	#_db_filter_array_elem_not_exists_to_undef
 }
 
 #---------------------------------------------------------------------------
 sub SHIFT {
 	my $self = shift;
 	my $value = $self->SUPER::SHIFT(@_);
-	return _db_filter_array_elem_not_exists_to_undef($value);
+	return defined $value && UNIVERSAL::isa($value, 'forks::BerkeleyDB::ElemNotExists') ? undef : $value;	#_db_filter_array_elem_not_exists_to_undef
 }
 
 sub UNSHIFT {
@@ -252,14 +249,12 @@ sub SPLICE {
 
 #---------------------------------------------------------------------------
 sub UNTIE {
-	my $self = shift;
-	eval { $self->db_sync(); };
+	eval { $_[0]->db_sync(); };
 }
 
 sub DESTROY {
-	my $self = shift;
-#	eval { $self->db_sync(); };
-	$self->SUPER::DESTROY(@_) if $self;
+#	eval { $_[0]->db_sync(); };
+	$_[0]->SUPER::DESTROY(@_) if $_[0];
 }
 
 #---------------------------------------------------------------------------

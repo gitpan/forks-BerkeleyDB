@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared;
 
-$VERSION = 0.051;
+$VERSION = 0.052;
 
 package
 	CORE::GLOBAL;	#hide from PAUSE
@@ -102,7 +102,7 @@ sub _filter_store_value {
 
 ########################################################################
 BEGIN {
-	use forks::shared (); die "forks version 0.18 required--this is only version $threads::VERSION" unless defined $forks::VERSION && $forks::VERSION >= 0.18;
+	require forks::shared; die "forks version 0.18 required--this is only version $forks::VERSION" unless defined $forks::VERSION && $forks::VERSION >= 0.18;
 	use forks::BerkeleyDB::shared::array;
 	
 	*_croak = *_croak = \&threads::_croak;
@@ -487,6 +487,12 @@ may not be what you expect.
 When share is used on arrays, hashes, array refs or hash refs, any data they contain will 
 be lost.  This correctly models the expected behavior of L<threads>, but not (currently) 
 of L<forks>.
+
+=head1 CAVIATS
+
+It appears that BerkeleyDB libdb 4.4.x environments are not fully thread-safe
+with BerkeleyDB CDB mode on some platforms.  Thus, it is highly recommended you
+use libdb 4.3.x and earlier, or 4.5.x and later.
 
 =head1 TODO
 

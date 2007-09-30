@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared::scalar;
 
-$VERSION = 0.051;
+$VERSION = 0.052;
 use strict;
 use warnings;
 use BerkeleyDB 0.27;
@@ -26,34 +26,30 @@ sub new {
 
 #---------------------------------------------------------------------------
 sub FETCH {
-	my $self = shift;
 	my ($key, $value) = (0, undef);
-	return undef unless $self->db_get($key, $value) == 0;
+	return undef unless $_[0]->db_get($key, $value) == 0;
 	return $value;
 }
 
 sub STORE {
-	my $self = shift;
-	return unless @_;
-	my $value = shift;
 	my $key = 0;
-	{
+	if (defined $_[1]) {
+		return undef unless $_[0]->db_put($key, $_[1]) == 0;
+	} else {
 		no warnings 'uninitialized';
-		return undef unless $self->db_put($key, $value) == 0;
+		return undef unless $_[0]->db_put($key, $_[1]) == 0;
 	}
-	return $value;
+	return $_[1];
 }
 
 #---------------------------------------------------------------------------
 sub UNTIE {
-	my $self = shift;
-	eval { $self->db_sync(); };
+	eval { $_[0]->db_sync(); };
 }
 
 sub DESTROY {
-	my $self = shift;
-#	eval { $self->db_sync(); };
-	$self->SUPER::DESTROY(@_) if $self;
+#	eval { $_[0]->db_sync(); };
+	$_[0]->SUPER::DESTROY(@_) if $_[0];
 }
 
 #---------------------------------------------------------------------------

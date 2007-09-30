@@ -1,3 +1,20 @@
+0.052	September 30 2007
+	Shared hash store and fetch are now 15% faster.
+	Shared array store is now 18% faster.
+	
+	Silenced a warning when storing undef in shared hash element.
+	
+	Corrected a bug with multiuser support and temp directory permissions.
+	
+	Updated distribution to require at least forks 0.23.
+	
+	Test suite will not allow this module to be used with BerkeleyDB 4.4, due to
+	apparent race-condition issues with CDB engine of that version.
+	
+	Implemented boolean hook $forks::DEFER_INIT_BEGIN_REQUIRE to insure shared
+	files are purged at process exit with forks 0.26 and later.
+	(Note: feature was broken in forks 0.24 - 0.25.)
+
 0.051	9 July 2007
 	Minor patch to forks::BerkeleyDB::shared to support forks::shared 0.24.
 	

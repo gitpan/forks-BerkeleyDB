@@ -10,7 +10,7 @@ WriteMakefile (
  ABSTRACT	=> 'High performance drop-in replacement for threads',
  VERSION_FROM	=> 'lib/forks/BerkeleyDB.pm',
  PREREQ_PM	=> {
-  'forks' => 0.18,
+  'forks' => 0.23,
   'Storable' => 0,
   'BerkeleyDB' => 0.27,
   'Tie::Restore' => 0.11,

@@ -1,7 +1,7 @@
 README for forks::BerkeleyDB
 
 Version:
- 0.051
+ 0.052
 
 This module is a drop-in replacement for threads.pm.  It has the
 same syntax as the threads.pm module (it even takes over its namespace) but
@@ -24,7 +24,7 @@ and/or modify it under the same terms as Perl itself.
 Required Modules:
  BerkeleyDB (0.27)
  Devel::Required (0.07)
- forks (0.18)
+ forks (0.23)
  Storable (any)
  Tie::Restore (0.11)
 
