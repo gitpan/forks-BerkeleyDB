@@ -1,6 +1,6 @@
 --- #YAML:1.0
 name:                forks-BerkeleyDB
-version:             0.052
+version:             0.053
 abstract:            High performance drop-in replacement for threads
 license:             ~
 generated_by:        ExtUtils::MakeMaker version 6.36

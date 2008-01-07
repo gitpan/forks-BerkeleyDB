@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared::hash;
 
-$VERSION = 0.052;
+$VERSION = 0.053;
 use strict;
 use warnings;
 use BerkeleyDB 0.27;
@@ -69,35 +69,12 @@ sub CLEAR {
 #sub EXISTS {}	#use BerkeleyDB.pm method
 
 #---------------------------------------------------------------------------
-sub FIRSTKEY {
-	my $self = shift;
-	my ($key, $value) = ('', undef);
-	my $cursor = $self->db_cursor();
-	return (wantarray ? (undef, undef) : undef)
-		unless $cursor->c_get($key, $value, DB_FIRST) == 0;
-	$cursor->c_close();
-	return wantarray ? ($key, $value) : $key;
-}
+#sub FIRSTKEY {}	#use BerkeleyDB.pm method
 
-sub NEXTKEY {
-	my $self = shift;
-	my $key = shift;
-	my $value = undef;
-	my $cursor = $self->db_cursor();
-	return (wantarray ? (undef, undef) : undef)
-		unless $cursor->c_get($key, $value, DB_SET) == 0;	#set cursor position
-	return (wantarray ? (undef, undef) : undef)
-		unless $cursor->c_get($key, $value, DB_NEXT) == 0;
-	$cursor->c_close();
-	return wantarray ? ($key, $value) : $key;
-}
+#sub NEXTKEY {}	#use BerkeleyDB.pm method
 
 #---------------------------------------------------------------------------
-sub SCALAR {
-	my $self = shift;
-	my $stat = $self->db_stat();
-	return defined $stat->{bt_nkeys} && $stat->{bt_nkeys} > 0 ? 1 : 0;
-}
+#sub SCALAR {}	#use BerkeleyDB.pm method (or FIRSTKEY if SCALAR not defined)
 
 #---------------------------------------------------------------------------
 sub UNTIE {

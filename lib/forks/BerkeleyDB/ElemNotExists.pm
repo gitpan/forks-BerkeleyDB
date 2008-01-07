@@ -1,7 +1,7 @@
 package
 	forks::BerkeleyDB::ElemNotExists;	#hide from PAUSE
 
-$VERSION = 0.052;
+$VERSION = 0.053;
 use strict;
 use warnings;
 

@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared;
 
-$VERSION = 0.052;
+$VERSION = 0.053;
 
 package
 	CORE::GLOBAL;	#hide from PAUSE

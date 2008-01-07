@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared::array;
 
-$VERSION = 0.052;
+$VERSION = 0.053;
 use strict;
 use warnings;
 use BerkeleyDB 0.27;
@@ -60,11 +60,7 @@ sub STORE {
 }
 
 #---------------------------------------------------------------------------
-sub FETCHSIZE {
-	my $self = shift;
-	my $stat = $self->db_stat();
-	return defined $stat->{bt_nkeys} && $stat->{bt_nkeys} > 0 ? $stat->{bt_nkeys} : 0;
-}
+#sub FETCHSIZE {} 	#use BerkeleyDB.pm method
 
 sub STORESIZE {
 	my $self = shift;

@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared::scalar;
 
-$VERSION = 0.052;
+$VERSION = 0.053;
 use strict;
 use warnings;
 use BerkeleyDB 0.27;
