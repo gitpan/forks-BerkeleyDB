@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared;
 
-$VERSION = 0.053;
+$VERSION = 0.054;
 
 package
 	CORE::GLOBAL;	#hide from PAUSE
@@ -102,27 +102,29 @@ sub _filter_store_value {
 
 ########################################################################
 BEGIN {
-	require forks::shared; die "forks version 0.18 required--this is only version $forks::VERSION" unless defined $forks::VERSION && $forks::VERSION >= 0.18;
+	require forks::shared;
+	die "forks::shared version 0.18 required--this is only version $forks::shared::VERSION"
+		unless defined $forks::shared::VERSION && $forks::shared::VERSION >= 0.18;
 	use forks::BerkeleyDB::shared::array;
 	
-	*_croak = *_croak = \&threads::_croak;
+	*_croak = *_croak = \&threads::shared::_croak;
 	
 	_croak( "Must first 'use forks::BerkeleyDB'\n" ) unless $INC{'forks/BerkeleyDB.pm'};
 
 	#need to store separate, serialized, db-disconnected copy in a separate database, so other threads can re-create arrayrefs and hashrefs
 	sub _tie_shared_cache () {
 		tie @shared_cache, 'forks::BerkeleyDB::shared::array', (
-			-Filename => ENV_PATH."/shared.bdb",
+			-Filename => ENV_PATH.'/shared.bdb',
 			-Flags    => DB_CREATE,
-			-Mode     => 0666,
-			-Env      => $forks::BerkeleyDB::bdb_env,
+			-Mode     => forks::BerkeleyDB::BDB_ENV_CHMOD_OCTVAL(),
+			-Env      => forks::BerkeleyDB::bdb_env,
 		);
 
 		tie @shared_cache_attr_bless, 'forks::BerkeleyDB::shared::array', (
-			-Filename => ENV_PATH."/shared_attr_bless.bdb",
+			-Filename => ENV_PATH.'/shared_attr_bless.bdb',
 			-Flags    => DB_CREATE,
-			-Mode     => 0666,
-			-Env      => $forks::BerkeleyDB::bdb_env,
+			-Mode     => forks::BerkeleyDB::BDB_ENV_CHMOD_OCTVAL(),
+			-Env      => forks::BerkeleyDB::bdb_env,
 		);
 	}
 	
@@ -132,13 +134,14 @@ BEGIN {
 	}
 	
 	sub _fork {
-		### safely sync & close databases ###
+		### safely sync/close databases ###
 		{
 			local $@;
 			foreach my $key (keys %object_refs) {
 				if ($object_refs{$key}->{bdb_is_connected}) {
-#					eval { $object_refs{$key}->{bdb}->db_sync(); };
+#					eval { $object_refs{$key}->{bdb}->db_sync(); };	#disabled: db_close expected to sync
 					eval { $object_refs{$key}->{bdb}->db_close(); };
+					$object_refs{$key}->{bdb} = undef;
 					$object_refs{$key}->{bdb_is_connected} = 0;
 				}
 				$object_refs{$key}->{bdb_is_connected} = 0;	#hint that this object must be recreated from cache
@@ -178,7 +181,7 @@ BEGIN {
 	#	local $@;
 	#	foreach my $key (keys %object_refs) {
 	#		if ($object_refs{$key}->{bdb_is_connected}) {
-	##			eval { $object_refs{$key}->{bdb}->db_sync(); };
+	##			eval { $object_refs{$key}->{bdb}->db_sync(); };	#disabled: db_close expected to sync
 	#			eval { $object_refs{$key}->{bdb}->db_close(); };
 	#			$object_refs{$key}->{bdb_is_connected} = 0;
 	#		}
@@ -196,14 +199,12 @@ BEGIN {
 }
 
 END {
-	{
-		local $@;
-		foreach my $key (keys %object_refs) {
-			if ($object_refs{$key}->{bdb_is_connected}) {
-#				eval { $object_refs{$key}->{bdb}->db_sync(); };
-				eval { $object_refs{$key}->{bdb}->db_close(); };
-				$object_refs{$key}->{bdb_is_connected} = 0;
-			}
+	local $@;
+	foreach my $key (keys %object_refs) {
+		if ($object_refs{$key}->{bdb_is_connected}) {
+#			eval { $object_refs{$key}->{bdb}->db_sync(); };	#disabled: db_close expected to sync
+			eval { $object_refs{$key}->{bdb}->db_close(); };
+			$object_refs{$key}->{bdb_is_connected} = 0;
 		}
 	}
 	eval { _untie_shared_cache(); };
@@ -224,8 +225,8 @@ sub _tiescalar ($) {
 		-Filename => $bdb_path,
 		-Flags    => DB_CREATE,
 		-Mode     => 0666,
-		-Env      => $forks::BerkeleyDB::bdb_env,
-	) or _croak( "Can't create bdb $bdb_path" );
+		-Env      => forks::BerkeleyDB::bdb_env,
+	) or _croak( "Can't create bdb $bdb_path: $!; $BerkeleyDB::Error" );
 	$obj->{bdb}->filter_fetch_value(\&_filter_fetch_value);
 	$obj->{bdb}->filter_store_value(\&_filter_store_value);
 	$obj->{bdb_is_connected} = 1;
@@ -252,8 +253,8 @@ sub _tiearray ($) {
 		-Flags    => DB_CREATE,
 		-Property => DB_RENUMBER,
 		-Mode     => 0666,
-		-Env      => $forks::BerkeleyDB::bdb_env,
-	) or _croak( "Can't create bdb $bdb_path" );
+		-Env      => forks::BerkeleyDB::bdb_env,
+	) or _croak( "Can't create bdb $bdb_path: $!; $BerkeleyDB::Error" );
 	$obj->{bdb}->filter_fetch_value(\&_filter_fetch_value);
 	$obj->{bdb}->filter_store_value(\&_filter_store_value);
 	$obj->{bdb_is_connected} = 1;
@@ -279,8 +280,8 @@ sub _tiehash ($) {
 		-Filename => $bdb_path,
 		-Flags    => DB_CREATE,
 		-Mode     => 0666,
-		-Env      => $forks::BerkeleyDB::bdb_env,
-	) or _croak( "Can't create bdb $bdb_path" );
+		-Env      => forks::BerkeleyDB::bdb_env,
+	) or _croak( "Can't create bdb $bdb_path: $!; $BerkeleyDB::Error" );
 	$obj->{bdb}->filter_fetch_value(\&_filter_fetch_value);
 	$obj->{bdb}->filter_store_value(\&_filter_store_value);
 	$obj->{bdb_is_connected} = 1;
@@ -466,9 +467,12 @@ See L<forks::shared> for common usage information.
 =head2 Location of database files
 
 This module will use $ENV{TMPDIR} (unless taint is on) or /tmp for all back-end database and
-other support files.  For the most part, BerkeleyDB will use shared memory for as much frequently
+other support files.  See L<forks::BerkeleyDB/"TMPDIR"> for more information.
+
+For the most part, BerkeleyDB will use shared memory for as much frequently
 accesed data as possible, so you probably won't notice drive-based performance hits.  For optimal
-performance, use a partition with a physical drive dedicate for tempory space usage.
+performance with large shared datastructures, use a partition with a dedicated drive for temporary
+space usage.  For best performance overall, use a ramdisk partition.
 
 =head1 NOTES
 
@@ -488,12 +492,6 @@ When share is used on arrays, hashes, array refs or hash refs, any data they con
 be lost.  This correctly models the expected behavior of L<threads>, but not (currently) 
 of L<forks>.
 
-=head1 CAVIATS
-
-It appears that BerkeleyDB libdb 4.4.x environments are not fully thread-safe
-with BerkeleyDB CDB mode on some platforms.  Thus, it is highly recommended you
-use libdb 4.3.x and earlier, or 4.5.x and later.
-
 =head1 TODO
 
 Monitor number of connected shared variables per thread and dynamically disconnect uncommonly
@@ -507,7 +505,7 @@ Eric Rybski <rybskej@yahoo.com>.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2006-2007 Eric Rybski <rybskej@yahoo.com>.
+Copyright (c) 2006-2008 Eric Rybski <rybskej@yahoo.com>.
 All rights reserved.  This program is free software; you can redistribute it
 and/or modify it under the same terms as Perl itself.
 

@@ -1,3 +1,19 @@
+0.054	March 25 2008
+	Fixed bug when forking that would prevent BerkeleyDB environment from explicitly
+	closing.  This used to cause occasional environment corruption with certain
+	BerkeleyDB releases.  forks::BerkeleyDB::shared is now fully compatible with
+	all 4.x Berkeley DB releases.
+	
+	Corrected issue with TMPDIR path privilege modification that could cause loss
+	of sticky bit (commonly used on certain platforms) and incorrect privileges
+	assigned to / and /tmp.
+	
+	Added user-level control over permission, user, and group settings for TMPDIR.
+	
+	Improved logging in certain terminal exception cases.
+	
+	Miscellaneous minor under-the-hood improvements.
+
 0.053	January 6 2008
 	Modified shared array FETCHSIZE to use default, optimized BerlekeyDB.pm methods.
 	This improves performance (efficient C function) and should improve overall 

@@ -1,7 +1,7 @@
 README for forks::BerkeleyDB
 
 Version:
- 0.053
+ 0.054
 
 This module is a drop-in replacement for threads.pm.  It has the
 same syntax as the threads.pm module (it even takes over its namespace) but
@@ -17,7 +17,7 @@ has some significant differences:
 - it is somewhat less efficient in shared variable data operations
 - it is less efficient in shared variable locking and signaling
 
-Copyright (c) 2006-2007 Eric Rybski <rybskej@yahoo.com>.
+Copyright (c) 2006-2008 Eric Rybski <rybskej@yahoo.com>.
 All rights reserved.  This program is free software; you can redistribute it
 and/or modify it under the same terms as Perl itself.
 
