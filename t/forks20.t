@@ -1,14 +1,16 @@
 #!/usr/local/bin/perl -T -w
-BEGIN {				# Magic Perl CORE pragma
+BEGIN {
     if ($ENV{PERL_CORE}) {
         chdir 't' if -d 't';
         @INC = '../lib';
+    } elsif (!grep /blib/, @INC) {
+        chdir 't' if -d 't';
+        unshift @INC, ('../blib/lib', '../blib/arch');
     }
 }
 
 BEGIN {delete $ENV{THREADS_DEBUG}} # no debugging during testing!
 
-use lib '../lib';
 use forks::BerkeleyDB; # must be done _before_ Test::More which loads real threads.pm
 use forks::BerkeleyDB::shared;
 use Config;
@@ -22,15 +24,47 @@ BEGIN {
     $reason = '';
     $reason = 'Thread::Queue not found'
      unless defined $Thread::Queue::VERSION;
-    $reason ||= 'Cannot test Thread::Queue with an unthreaded Perl'
-     unless $Config{'useithreads'};
 
     $tests = 1 if $reason;
 } #BEGIN
 
+# "Unpatch" Test::More, who internally tries to disable threads
+BEGIN {
+    no warnings 'redefine';
+    if ($] < 5.008001) {
+        require forks::shared::global_filter;
+        import forks::shared::global_filter 'Test::Builder';
+        require Test::Builder;
+        *Test::Builder::share = \&threads::shared::share;
+        *Test::Builder::lock = \&threads::shared::lock;
+        Test::Builder->new->reset;
+    }
+}
+
+# Patch Test::Builder to add fork-thread awareness
+{
+    no warnings 'redefine';
+    my $_sanity_check_old = \&Test::Builder::_sanity_check;
+    *Test::Builder::_sanity_check = sub {
+        my $self = $_[0];
+        # Don't bother with an ending if this is a forked copy.  Only the parent
+        # should do the ending.
+        if( $self->{Original_Pid} != $$ ) {
+            return;
+        }
+        $_sanity_check_old->(@_);
+    };
+}
+
 use Test::More tests => $tests;
 use strict;
 use warnings;
+
+diag( <<EOD );
+
+These tests validate compatibility with Thread::Queue.
+
+EOD
 
 SKIP: {
     skip $reason, $tests if $reason;
@@ -87,3 +121,5 @@ SKIP: {
 
 #------------------------------------------------------------------------
 } #SKIP
+
+1;

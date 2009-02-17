@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared;
 
-$VERSION = 0.054;
+$VERSION = 0.060;
 
 package
 	CORE::GLOBAL;	#hide from PAUSE
@@ -14,18 +14,20 @@ package forks::BerkeleyDB::shared;
 
 use strict;
 use warnings;
+use vars qw(@ISA);
+@ISA = 'forks::shared';
+
 use forks::BerkeleyDB::Config;
 use BerkeleyDB 0.27;
 use Storable qw(freeze thaw);
 use Tie::Restore 0.11;
-use Scalar::Util qw(blessed reftype);
-#use Scalar::Util qw(weaken);
+use Scalar::Util qw(blessed reftype weaken);
 
 use constant DEBUG => forks::BerkeleyDB::Config::DEBUG();
 use constant ENV_PATH => forks::BerkeleyDB::Config::ENV_PATH();
 #use Data::Dumper;
 
-our %object_refs;	#refs of all shared objects (for CLONE use, and strong refs: allow shared vars to hold other shared vars as values; END{...} cleanup in all threads)
+our %object_refs;	#refs of all shared objects (for CLONE use, and weak refs: allow shared vars to hold other shared vars as values; END{...} cleanup in all threads)
 our @shared_cache;	#tied BDB array that stores shared variable objects for other threads to use to reconstitute if they were created outside their scope
 our @shared_cache_attr_bless;	#tied BDB array that stores shared variable object attribute bless
 
@@ -45,30 +47,32 @@ sub _filter_fetch_value {
 		}
 		else {	#is a shared var, retie to same shared ordinal
 #warn Dumper($_, $object_refs{$_}, defined $shared_cache[$_] ? thaw($shared_cache[$_]) : undef) if DEBUG;
+			my $obj;
 			if (!defined $object_refs{$_} || !defined $object_refs{$_}->{bdb_is_connected} || !$object_refs{$_}->{bdb_is_connected}) {	#shared var created outside scope of this thread or needs to be reloaded: load object from shared var cache & reconnect to db
-#warn "*********".threads->tid().": _filter_fetch_value -> obj \#$_ recreated\n"; #if DEBUG;
-				my $obj = defined $object_refs{$_} && defined $object_refs{$_}->{bdb_module} 
+				$obj = defined $object_refs{$_} && defined $object_refs{$_}->{bdb_module} 
 					? $object_refs{$_}
 					: eval { @{thaw($forks::BerkeleyDB::shared::shared_cache[$_])}[0] };
+#warn "*********".threads->tid().": _filter_fetch_value -> obj \#$_ recreated: $obj\n"; #if DEBUG;
 				_croak( "Unable to load object state for shared variable \#$_" ) unless defined $obj;
 				my $sub = '_tie'.$obj->{type};
 				{
 					no strict 'refs';
 					&{$sub}($obj);
 				}
+			} else {
+				$obj = $object_refs{$_};
 			}
 			my $class = $shared_cache_attr_bless[$_];
-
-			if ($object_refs{$_}->{'type'} eq 'scalar')
-				{ my $s; tie $s, 'Tie::Restore', $object_refs{$_}; $_ = $class ? CORE::bless(\$s, $class) : \$s; }
-			elsif ($object_refs{$_}->{'type'} eq 'array')
-				{ my @a; tie @a, 'Tie::Restore', $object_refs{$_}; $_ = $class ? CORE::bless(\@a, $class) : \@a; }
-			elsif ($object_refs{$_}->{'type'} eq 'hash')
-				{ my %h; tie %h, 'Tie::Restore', $object_refs{$_}; $_ = $class ? CORE::bless(\%h, $class) : \%h; }
-#			elsif ($object_refs{$_}->{'type'} eq 'scalar')
-#				{ my *h; tie *h, 'Tie::Restore', $object_refs{$_}; $_ = $class ? CORE::bless(\*h, $class) : \*h; }
+			if ($obj->{'type'} eq 'scalar')
+				{ my $s; tie $s, 'Tie::Restore', $obj; $_ = $class ? CORE::bless(\$s, $class) : \$s; }
+			elsif ($obj->{'type'} eq 'array')
+				{ my @a; tie @a, 'Tie::Restore', $obj; $_ = $class ? CORE::bless(\@a, $class) : \@a; }
+			elsif ($obj->{'type'} eq 'hash')
+				{ my %h; tie %h, 'Tie::Restore', $obj; $_ = $class ? CORE::bless(\%h, $class) : \%h; }
+#			elsif ($obj->{'type'} eq 'handle')
+#				{ my *h; tie *h, 'Tie::Restore', $obj; $_ = $class ? CORE::bless(\*h, $class) : \*h; }
 			else {
-				_croak( "Unable to restore shared variable \#$_: ".ref($object_refs{$_}) );
+				_croak( "Unable to restore shared variable \#$_: ".ref($obj) );
 			}
 		}
 	}
@@ -233,7 +237,7 @@ sub _tiescalar ($) {
 
 	### store ref in package variable ###
 	$object_refs{$obj->{ordinal}} = $obj;
-#	weaken($object_refs{$obj->{ordinal}});
+	weaken($object_refs{$obj->{ordinal}});
 	
 	return $obj;
 }
@@ -261,7 +265,7 @@ sub _tiearray ($) {
 	
 	### store ref in package variable ###
 	$object_refs{$obj->{ordinal}} = $obj;
-#	weaken($object_refs{$obj->{ordinal}});
+	weaken($object_refs{$obj->{ordinal}});
 
 	return $obj;
 }
@@ -288,7 +292,7 @@ sub _tiehash ($) {
 	
 	### store ref in package variable ###
 	$object_refs{$obj->{ordinal}} = $obj;
-#	weaken($object_refs{$obj->{ordinal}});
+	weaken($object_refs{$obj->{ordinal}});
 
 	return $obj;
 }
@@ -304,6 +308,7 @@ sub _tiehandle ($) {
 	
 	### store ref in package variable ###
 	$object_refs{$obj->{ordinal}} = $obj;
+	weaken($object_refs{$obj->{ordinal}});
 
 	return $obj;
 }
@@ -321,18 +326,6 @@ sub _tiehandle ($) {
 		
 		if ($ref eq 'SCALAR') {
 			$object = tied ${$it};
-#			my $ref2 = reftype ${$it} || '';	#not necessary?
-#			if ($ref2 eq 'SCALAR') {
-#				$object = tied ${${$it}};
-#			} elsif ($ref2 eq 'ARRAY') {
-#				$object = tied @{${$it}};
-#			} elsif ($ref2 eq 'HASH') {
-#				$object = tied %{${$it}};
-#			} elsif ($ref2 eq 'GLOB') {
-#				$object = tied *{${$it}};
-#			} else {
-#				$object = tied ${$it};
-#			}
 		} elsif ($ref eq 'ARRAY') {
 			$object = tied @{$it};
 		} elsif ($ref eq 'HASH') {
@@ -346,25 +339,59 @@ sub _tiehandle ($) {
 			$shared_cache_attr_bless[$object->{ordinal}] = $class;
 		}
 	}
+	
+	my $old_tie = \&threads::shared::_tie;
+	*threads::shared::_tie = sub {
+		my $class = shift;
+		my $type = shift;
+		my $self = shift || {};
 
-	sub threads::shared::TIESCALAR {
-		return forks::BerkeleyDB::shared::_tiescalar(shift->_tie( 'scalar',@_ ));
-	}
-	sub threads::shared::TIEARRAY {
-		return forks::BerkeleyDB::shared::_tiearray(shift->_tie( 'array',@_ ));
-	}
-	sub threads::shared::TIEHASH {
-		return forks::BerkeleyDB::shared::_tiehash(shift->_tie( 'hash',@_ ));
-	}
-	sub threads::shared::TIEHANDLE {
-		return forks::BerkeleyDB::shared::_tiehandle(shift->_tie( 'handle',@_ ));
-	}
+		# Call parent tie
+		my $obj;
+		{
+			local $threads::shared::CLONE_TIED = 0;	#just register with shared process; don't store
+			$obj = $old_tie->( $class,$type,$self,@_ );
+		}
+		
+		# Perform tie to BDB resources
+		if ($type eq 'scalar') {
+			forks::BerkeleyDB::shared::_tiescalar($obj);
+		} elsif ($type eq 'array') {
+			forks::BerkeleyDB::shared::_tiearray($obj);
+		} elsif ($type eq 'hash') {
+			forks::BerkeleyDB::shared::_tiehash($obj);
+		} elsif ($type eq 'handle') {
+			forks::BerkeleyDB::shared::_tiehandle($obj);
+		} else {
+			_croak("Unknown tie type $type");
+		}
+		
+		# Clone any existing data
+		my $data = shift;
+		if ($threads::shared::CLONE_TIED) {
+			if ($type eq 'scalar' && ref($data) eq 'SCALAR' && defined ${$data}) {
+				$obj->STORE(ref(${$data}) ? threads::shared::shared_clone(${$data}) : ${$data});
+			#TODO else handle other clone cases here
+			} elsif ($type eq 'array' && ref($data) eq 'ARRAY' && @{$data}) {
+				for (my $i = 0; $i < @{$data}; $i++) {
+					$obj->STORE($i, ref($data->[$i]) ? threads::shared::shared_clone($data->[$i]) : $data->[$i]);
+				}
+			} elsif ($type eq 'hash' && ref($data) eq 'HASH' && %{$data}) {
+				foreach (keys %{$data}) {
+					$obj->STORE($_, ref($data->{$_}) ? threads::shared::shared_clone($data->{$_}) : $data->{$_});
+				}
+			}
+		}
+		
+		return $obj;
+	};
 
 	sub threads::shared::AUTOLOAD {
 		my $self = shift;
+		my $obj;
 		if (!defined $self->{bdb_is_connected} || !$self->{bdb_is_connected}) {	#shared var needs to be reloaded: load shared var cache & connect to db
 #warn "*********".threads->tid().": threads::shared::AUTOLOAD -> obj \#$self->{ordinal}\n"; #if DEBUG;
-			my $obj = defined $object_refs{$self->{ordinal}} && defined $object_refs{$self->{ordinal}}->{bdb_module} 
+			$obj = defined $object_refs{$self->{ordinal}} && defined $object_refs{$self->{ordinal}}->{bdb_module} 
 				? $object_refs{$self->{ordinal}}
 				: eval { @{thaw($forks::BerkeleyDB::shared::shared_cache[$self->{ordinal}])}[0] };
 			_croak( "Unable to load object state for shared variable \#$self->{ordinal}" ) unless defined $obj;
@@ -373,6 +400,8 @@ sub _tiehandle ($) {
 				no strict 'refs';
 				$self = &{$sub}($obj);
 			}
+		} else {
+			$obj = $object_refs{$self->{ordinal}};
 		}
 		(my $sub = $threads::shared::AUTOLOAD) =~ s/^.*::/$self->{'bdb_module'}::/;
 #warn "$sub, $self->{ordinal}" if DEBUG;
@@ -382,12 +411,77 @@ sub _tiehandle ($) {
 		wantarray ? @result : $result[0];
 	}
 	
-	sub threads::shared::PUSH {
-		$threads::shared::AUTOLOAD = 'threads::shared::PUSH';
-		threads::shared::AUTOLOAD(@_);
+# Define generic perltie proxy methods for most scalar, array, hash, and handle events
+
+	no strict 'refs';
+	foreach my $method (qw/BINMODE CLEAR CLOSE EOF EXTEND FETCHSIZE FILENO GETC
+		OPEN POP PRINT PRINTF READ READLINE SCALAR SEEK SHIFT STORESIZE TELL UNSHIFT WRITE
+		PUSH/) {
+		*{"threads::shared::$method"} = sub {
+			$threads::shared::AUTOLOAD = 'threads::shared::'.$method;
+			threads::shared::AUTOLOAD(@_);
+		};
+	}
+
+	foreach my $method (qw/DELETE EXISTS FIRSTKEY NEXTKEY/) {
+		*{"threads::shared::$method"} = sub {
+			my $self = shift;
+			my $sub = $self->{'module'}.'::'.$method;
+			if ($self->{'type'} eq 'hash' && ref($_[0]) eq 'CODE') {
+				$_[0] = "$_[0]";
+			}
+			$threads::shared::AUTOLOAD = 'threads::shared::'.$method;
+			threads::shared::AUTOLOAD($self, @_);
+		};
+	}
+
+	sub threads::shared::STORE {
+		my $self = shift;
+
+		# If this is a scalar and to-be stored value is a reference
+		#  Obtain the object
+		#  Die if the reference is not a threads::shared tied object
+		my $val = $_[$self->{'type'} eq 'scalar' ? 0 : 1];
+		if (my $ref = reftype($val)) {
+			my $object;
+			if ($ref eq 'SCALAR') {
+				$object = tied ${$val};
+			} elsif ($ref eq 'ARRAY') {
+				$object = tied @{$val};
+			} elsif ($ref eq 'HASH') {
+				$object = tied %{$val};
+			} elsif ($ref eq 'GLOB') {
+				$object = tied *{$val};
+			}
+			Carp::croak "Invalid value for shared scalar"
+				unless defined $object && $object->isa('threads::shared');
+		}
+
+		# If we're a hash and the key is a code reference
+		#  Force key stringification, to insure remote server uses same key value as thread
+		if ($self->{'type'} eq 'hash' && ref($_[0]) eq 'CODE') {
+			$_[0] = "$_[0]";
+		}
+		$threads::shared::AUTOLOAD = 'threads::shared::STORE';
+		threads::shared::AUTOLOAD($self, @_);
+	}
+	
+	sub threads::shared::FETCH {
+
+		# If we're a hash and the key is a code reference
+		#  Force key stringification, to insure remote server uses same key value as thread
+
+		my $self = shift;
+			if ($self->{'type'} eq 'hash' && ref($_[0]) eq 'CODE') {
+			$_[0] = "$_[0]";
+		}
+		$threads::shared::AUTOLOAD = 'threads::shared::FETCH';
+		threads::shared::AUTOLOAD($self, @_);
 	}
 
 	sub threads::shared::SPLICE {
+		# Die now if running in thread emulation mode
+		Carp::croak('Splice not implemented for shared arrays') if eval {forks::THREADS_NATIVE_EMULATION()};
 		$threads::shared::AUTOLOAD = 'threads::shared::SPLICE';
 		threads::shared::AUTOLOAD(@_);
 	}
@@ -476,26 +570,33 @@ space usage.  For best performance overall, use a ramdisk partition.
 
 =head1 NOTES
 
-Forks 0.19 or later is required to support transparent blessing across threads.  This feature
-will be silently disabled if this requirement is not met.
-
-Currently optimizes SCALAR, ARRAY, and HASH shared variables.  HANDLE type is supported 
+Currently only SCALAR, ARRAY, and HASH shared variables are optimized.  HANDLE type is supported 
 using the default method implemented by L<forks::shared>.
 
 Shared variable access and modification are NOT guaranteed to be handled as atomic events.  
-This deviates from undocumented L<forks> behavior, where all these events are atomic, but
-it correctly models the expected behavior of L<threads>.  Thus, don't forget to lock() 
+This correctly models the expected behavior of L<threads> but deviates from undocumented
+L<forks> behavior, where these events are atomic.  Thus, don't forget to lock() 
 your shared variable before using them concurrently in multiple threads; otherwise, results
 may not be what you expect.
 
-When share is used on arrays, hashes, array refs or hash refs, any data they contain will 
-be lost.  This correctly models the expected behavior of L<threads>, but not (currently) 
-of L<forks>.
+Variables retain their pre-existing values after being shared.  This may cause slow sharing
+of a variable if the variable contained many (large) values, or may trigger errors if the
+variable contained value(s) that are not valid for sharing.  This differs from the default
+behavior of L<threads>; see L<forks/"Native threads 'to-the-letter' emulation mode"> if you
+wish to make C<forks::BerkeleyDB> clear array/hash values just like native L<threads>.
+Rule of thumb: always undef a variable before sharing it, unless you trust any pre-existing
+value(s) to be sharable.
 
 =head1 TODO
 
+Add support for shared circular references (REF).
+
 Monitor number of connected shared variables per thread and dynamically disconnect uncommonly
 used vars based on last usage and/or frequency of usage (to meet BDB environment lock limits).
+
+Allow for configurable lock limits (detault is 1000).  Maybe simple DB_CONFIG file in env with:
+set_lk_max_locks N
+set_lk_max_objects N
 
 Implement shared variable locks, signals, and waiting with BerkeleyDB.
 
@@ -505,7 +606,7 @@ Eric Rybski <rybskej@yahoo.com>.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2006-2008 Eric Rybski <rybskej@yahoo.com>.
+Copyright (c) 2006-2009 Eric Rybski <rybskej@yahoo.com>.
 All rights reserved.  This program is free software; you can redistribute it
 and/or modify it under the same terms as Perl itself.
 

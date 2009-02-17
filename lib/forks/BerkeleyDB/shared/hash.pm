@@ -1,6 +1,6 @@
 package forks::BerkeleyDB::shared::hash;
 
-$VERSION = 0.054;
+$VERSION = 0.060;
 use strict;
 use warnings;
 use BerkeleyDB 0.27;
@@ -106,7 +106,7 @@ Eric Rybski <rybskej@yahoo.com>.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2006-2008 Eric Rybski <rybskej@yahoo.com>.
+Copyright (c) 2006-2009 Eric Rybski <rybskej@yahoo.com>.
 All rights reserved.  This program is free software; you can redistribute it
 and/or modify it under the same terms as Perl itself.
 

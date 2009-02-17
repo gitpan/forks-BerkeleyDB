@@ -17,6 +17,11 @@ t/forks00.t
 t/forks01.t
 t/forks02.t
 t/forks03.t
+t/forks04.t
+t/forks05.t
+t/forks06.t
+t/forks07.t
+t/forks08.t
 t/forks20.t
 t/forks99.t
 TODO

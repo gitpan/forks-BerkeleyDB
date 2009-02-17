@@ -3,7 +3,7 @@ package forks::BerkeleyDB::shared::handle;
 # Make sure we have version info for this module
 # Make sure we do everything by the book from now on
 
-$VERSION = 0.054;
+$VERSION = 0.060;
 use strict;
 use warnings;
 
@@ -63,7 +63,7 @@ Eric Rybski <rybskej@yahoo.com>.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2006-2008 Eric Rybski <rybskej@yahoo.com>.
+Copyright (c) 2006-2009 Eric Rybski <rybskej@yahoo.com>.
 All rights reserved.  This program is free software; you can redistribute it
 and/or modify it under the same terms as Perl itself.
 

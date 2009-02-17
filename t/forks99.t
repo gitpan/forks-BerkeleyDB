@@ -34,4 +34,6 @@ SKIP: {
     cmp_ok $ret, '==', Module::Signature::SIGNATURE_OK(), "Valid signature";
 }
 
+1;
+
 __END__

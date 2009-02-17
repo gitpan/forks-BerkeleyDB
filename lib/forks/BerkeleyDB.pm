@@ -1,14 +1,13 @@
 package forks::BerkeleyDB;
 
-$VERSION = 0.054;
+$VERSION = 0.060;
 
 package
 	CORE::GLOBAL;	#hide from PAUSE
 use subs qw(fork);
 {
 	no warnings 'redefine';
-	$forks::BerkeleyDB::_parent_fork = \&fork
-		if defined($forks::VERSION) && $forks::VERSION >= 0.22;
+	$forks::BerkeleyDB::_parent_fork = \&fork;
 	*fork = \&forks::BerkeleyDB::_fork;
 }
 
@@ -80,20 +79,31 @@ use constant DEFAULT_ENV_PATHS => (ENV_PATH, (USE_BDB_LOCKS() ? ENV_PATH_LOCKSIG
 
 BEGIN {
 	$forks::DEFER_INIT_BEGIN_REQUIRE = 1;	#feature in forks 0.26 and later
-	require forks; die "forks version 0.18 required--this is only version $forks::VERSION"
-		unless defined($forks::VERSION) && $forks::VERSION >= 0.18;
+	require forks; die "forks version 0.28 required--this is only version $forks::VERSION"
+		unless defined($forks::VERSION) && $forks::VERSION >= 0.28;
 	
 	### set up environment characteristics ###
 	*_croak = *_croak = \&threads::_croak;
 	{
+		### safely sync/close databases, close environment at important server states ###
 		no warnings 'redefine';
-		*threads::_end_server_post_shutdown = *threads::_end_server_post_shutdown
-			= sub {
-				eval {
-					forks::BerkeleyDB::_purge_env();
-				};
-			}
-			if defined($forks::VERSION) && $forks::VERSION >= 0.23;
+
+		my $old_server_pre_startup = \&threads::_server_pre_startup;
+		*threads::_server_pre_startup = sub {
+			$old_server_pre_startup->(@_);
+			eval {
+				forks::BerkeleyDB::_untie_support_vars();
+				forks::BerkeleyDB::_close_env();
+			};
+		};
+
+		my $old_end_server_post_shutdown = \&threads::_end_server_post_shutdown;
+		*threads::_end_server_post_shutdown = sub {
+			$old_end_server_post_shutdown->(@_);
+			eval {
+				forks::BerkeleyDB::_purge_env();
+			};
+		};
 	}
 
 	sub _open_env () {
@@ -118,7 +128,7 @@ BEGIN {
 			closedir(ENVDIR);
 			foreach (@env_files) {
 				my $file = "$env_dir/$_";
-				$file =~ m/^([\/-\@\w_.]+)$/so;	#untaint
+				$file =~ m/^(.+)$/so;	#untaint
 				#TODO: do we need to modify owner and grp to use custom environment settings?
 				chmod BDB_ENV_CHMOD_OCTVAL | 0111, $1;
 			}
@@ -140,7 +150,7 @@ BEGIN {
 			warn "unlinking: ".join(', ', map("$env_dir/$_", @files_to_del)) if DEBUG;
 			foreach (@files_to_del) {
 				my $file = "$env_dir/$_";
-				$file =~ m/^([\/-\@\w_.]+)$/so;	#untaint
+				$file =~ m/^(.+)$/so;	#untaint
 				_croak( "Unable to unlink file '$1'. Please manually remove this file." )
 					unless unlink $1;
 			}
@@ -229,7 +239,7 @@ forks::BerkeleyDB - high-performance drop-in replacement for threads
 
 =head1 VERSION
 
-This documentation describes version 0.054.
+This documentation describes version 0.06.
 
 =head1 SYNOPSYS
 
@@ -273,7 +283,7 @@ comparable to native ithreads.
 
  BerkeleyDB (0.27)
  Devel::Required (0.07)
- forks (0.23)
+ forks (0.29)
  Storable (any)
  Tie::Restore (0.11)
 
@@ -310,7 +320,7 @@ will use the Perl default; e.g. current process (thread) effective group.
 
 =head1 NOTES
 
-If you have forks.pm 0.23 or later installed, all database files created during runtime
+All database files created during runtime
 will be automatically purged when the main thread exits.  If you have created a large number
 of shared variables, you may experience a slight delay during process exit.  Note that these
 files may not be cleaned up if the main thread or process group is terminated using SIGKILL,
@@ -347,7 +357,7 @@ Eric Rybski <rybskej@yahoo.com>.
 
 =head1 COPYRIGHT
 
-Copyright (c) 2006-2008 Eric Rybski <rybskej@yahoo.com>.
+Copyright (c) 2006-2009 Eric Rybski <rybskej@yahoo.com>.
 All rights reserved.  This program is free software; you can redistribute it
 and/or modify it under the same terms as Perl itself.
 

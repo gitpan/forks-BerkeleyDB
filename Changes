@@ -1,4 +1,26 @@
-0.054	March 25 2008
+0.060	February 16 2009
+	Fix compatibility with forks 0.29 (now a minimum requirement) and later.
+
+	*** Behavior change *** All variables now retain their pre-existing values after
+	being shared.  This may cause slow sharing of a variable if the variable contained
+	many values or was very large, or may trigger errors if the variable contained
+	value(s) that are not valid for sharing.  Rule of thumb: always undef a variable
+	before sharing it, unless you trust any pre-existing value(s) to be sharable.
+	
+	Improved shared variable memory management: more efficient use of BDB environment
+	resources on a per-thread basis.
+	
+	Now correctly handles tmpdir locations with non-alphanumeric chars in the path.
+	
+	Support forks::BerkeleyDB::shared->set_deadlock_option.
+	
+	Silence spurious warnings when pushing undef values on shared array.
+	
+	Close unused environment resources in shared server.
+
+	Integrated all forks 0.30 tests.
+
+0.054	March 25 2009
 	Fixed bug when forking that would prevent BerkeleyDB environment from explicitly
 	closing.  This used to cause occasional environment corruption with certain
 	BerkeleyDB releases.  forks::BerkeleyDB::shared is now fully compatible with
